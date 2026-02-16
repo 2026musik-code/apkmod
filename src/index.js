@@ -67,6 +67,13 @@ const html = `
         ::-webkit-scrollbar-thumb:hover {
             background: #d4af37;
         }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-start py-10 px-4">
@@ -91,6 +98,28 @@ const html = `
             <button onclick="searchMods()" class="btn-luxury px-8 py-4 rounded-full m-1 hover:scale-105 transform">
                 SEARCH
             </button>
+        </div>
+    </div>
+
+    <!-- Categories -->
+    <div class="w-full max-w-7xl mb-8 px-4">
+        <div class="flex overflow-x-auto space-x-4 pb-4 no-scrollbar" id="categoryList">
+            <button onclick="filterCategory('Viral')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-yellow-600/50 bg-yellow-600/20 text-yellow-500 font-semibold transition-all">Viral</button>
+            <button onclick="filterCategory('Chat')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">Chat</button>
+            <button onclick="filterCategory('Game')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">Game</button>
+            <button onclick="filterCategory('+18')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">+18</button>
+            <button onclick="filterCategory('VPN')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">VPN</button>
+            <button onclick="filterCategory('Browser')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">Browser</button>
+        </div>
+    </div>
+
+    <!-- Recommended Section -->
+    <div id="recommendedSection" class="w-full max-w-7xl mb-12 px-4">
+        <h2 class="text-2xl font-bold mb-6 text-yellow-500 border-l-4 border-yellow-500 pl-4">Recommended</h2>
+        <div id="recommendedList" class="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 no-scrollbar">
+            <!-- Loading placeholders -->
+            <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
+            <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
         </div>
     </div>
 
@@ -195,6 +224,84 @@ const html = `
             errorDiv.classList.remove('hidden');
         }
 
+        let currentCategory = 'Viral';
+
+        async function filterCategory(category) {
+            currentCategory = category;
+            updateCategoryButtons();
+            await fetchRecommendations(category);
+        }
+
+        function updateCategoryButtons() {
+            const buttons = document.querySelectorAll('.category-btn');
+            buttons.forEach(btn => {
+                const btnCategory = btn.textContent.trim();
+                // Reset styles
+                btn.className = 'category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all';
+
+                if (btnCategory === currentCategory) {
+                    // Active style
+                    btn.className = 'category-btn whitespace-nowrap px-6 py-2 rounded-full border border-yellow-600/50 bg-yellow-600/20 text-yellow-500 font-semibold transition-all';
+                }
+            });
+        }
+
+        async function fetchRecommendations(category) {
+            const list = document.getElementById('recommendedList');
+            // specific loading skeleton for carousel
+            list.innerHTML = `
+                <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
+                <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
+            `;
+
+            try {
+                const response = await fetch(\`\${API_URL}?query=\${encodeURIComponent(category)}&apikey=\${API_KEY}\`);
+                const data = await response.json();
+
+                list.innerHTML = '';
+
+                if (data.success && data.data && data.data.length > 0) {
+                    data.data.forEach(item => {
+                        const card = createRecommendationCard(item);
+                        list.appendChild(card);
+                    });
+                } else {
+                    list.innerHTML = '<div class="text-gray-500 p-4 min-w-full text-center">No recommendations found.</div>';
+                }
+            } catch (err) {
+                console.error(err);
+                list.innerHTML = '<div class="text-red-500 p-4 min-w-full text-center">Failed to load recommendations.</div>';
+            }
+        }
+
+        function createRecommendationCard(item) {
+             const card = document.createElement('div');
+             // 1 row 2 columns layout: min-w-[calc(50%-0.5rem)]
+             card.className = 'min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center card rounded-xl overflow-hidden shadow-lg flex flex-col h-full';
+
+             const imgUrl = item.image || 'https://via.placeholder.com/300x200?text=No+Image';
+
+             card.innerHTML = \`
+                <div class="relative h-32 overflow-hidden">
+                    <img src="\${imgUrl}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" alt="\${item.title}" class="w-full h-full object-cover">
+                    <div class="absolute top-1 right-1 bg-black/70 backdrop-blur-md text-yellow-400 text-[10px] font-bold px-1.5 py-0.5 rounded border border-yellow-500/30">
+                        \${item.version}
+                    </div>
+                </div>
+                <div class="p-4 flex-grow flex flex-col">
+                    <h3 class="text-sm font-bold mb-1 text-white line-clamp-1" title="\${item.title}">\${item.title}</h3>
+                    <div class="mb-3 flex-grow">
+                         <p class="text-gray-400 text-xs line-clamp-2">\${item.modFeature || 'Modded'}</p>
+                    </div>
+                    <a href="\${item.link}" target="_blank" rel="noopener noreferrer"
+                       class="btn-luxury text-center py-2 rounded text-xs uppercase font-bold shadow-lg block mt-auto hover:text-black hover:no-underline">
+                        Download
+                    </a>
+                </div>
+             \`;
+             return card;
+        }
+
         // Optional: Trigger search on load if query param exists
         window.addEventListener('load', () => {
              const urlParams = new URLSearchParams(window.location.search);
@@ -202,6 +309,9 @@ const html = `
              if (q) {
                  document.getElementById('searchInput').value = q;
                  searchMods();
+                 filterCategory('Viral');
+             } else {
+                 filterCategory('Viral');
              }
         });
     </script>
