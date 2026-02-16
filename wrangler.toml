@@ -1,0 +1,6 @@
+name = "mod-apps"
+main = "src/index.js"
+compatibility_date = "2024-02-16"
+
+[placement]
+mode = "smart"
