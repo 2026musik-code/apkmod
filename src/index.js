@@ -1,5 +1,6 @@
 
-const API_KEY = 'dedi131'; // In a real app, use env.API_KEY
+// Default fallback for development/demo (Note: Should be kept secret in production)
+const DEFAULT_API_KEY = 'dedi131';
 
 const html = `
 <!DOCTYPE html>
@@ -306,7 +307,11 @@ const html = `
                 imgElement.src = url;
             }
             imgElement.onload = () => imgElement.classList.remove('animate-pulse', 'bg-gray-800');
-            imgElement.onerror = () => { imgElement.src = 'https://via.placeholder.com/200x300?text=Error'; imgElement.classList.remove('animate-pulse', 'bg-gray-800'); };
+            imgElement.onerror = () => {
+                imgElement.onerror = null; // Prevent infinite loop
+                imgElement.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMzAwIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iI2ZmZiIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+SW1hZ2UgRXJyb3I8L3RleHQ+PC9zdmc+';
+                imgElement.classList.remove('animate-pulse', 'bg-gray-800');
+            };
         }
 
         async function fetchMods(query = 'Michat') {
@@ -415,6 +420,7 @@ const html = `
         function infoHero() { if (window.currentItem) openDetail(window.currentItem); }
 
         async function openDetail(item) {
+            console.log('openDetail called for', item.title);
             const modal = document.getElementById('detailModal');
             loadImage(item.cover, document.getElementById('modalPoster'));
             loadImage(item.cover, document.getElementById('modalPosterMobile'));
@@ -513,7 +519,11 @@ const html = `
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const API_KEY_VAL = env.API_KEY || API_KEY;
+    const API_KEY_VAL = env.API_KEY || DEFAULT_API_KEY;
+
+    if (!API_KEY_VAL) {
+        return new Response('API_KEY is not configured', { status: 500 });
+    }
 
     // --- API Proxies ---
     if (url.pathname === '/api/mod') {
