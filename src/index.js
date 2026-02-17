@@ -144,7 +144,6 @@ const html = `
 
     <!-- Main Content: DRAKOR MODS -->
     <main id="drakorPage" class="hidden pt-16 min-h-screen bg-darker">
-
         <!-- Hero Banner -->
         <div id="drakorHero" class="relative w-full h-[50vh] md:h-[60vh] bg-gray-900 overflow-hidden mb-8 hidden">
             <img id="heroImage" src="" alt="Hero" class="w-full h-full object-cover opacity-60">
@@ -173,10 +172,8 @@ const html = `
     <!-- Detail Modal -->
     <div id="detailModal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
-
         <div class="relative min-h-screen md:flex md:items-center md:justify-center p-0 md:p-4">
             <div class="bg-[#181818] w-full md:max-w-4xl md:rounded-xl shadow-2xl overflow-hidden relative min-h-screen md:min-h-0">
-
                 <button onclick="closeModal()" class="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 rounded-full text-white hover:bg-white/20 flex items-center justify-center transition">
                     <i class="fas fa-times"></i>
                 </button>
@@ -261,17 +258,21 @@ const html = `
             </h3>
 
             <div class="mb-4">
-                <label class="block text-sm text-gray-400 mb-2">API Key</label>
+                <p id="apiKeyStatus" class="text-sm text-gray-400 mb-2">Memeriksa status...</p>
+                <label class="block text-sm text-gray-400 mb-2">Set API Key Baru</label>
                 <input type="password" id="apiKeyInput" placeholder="Masukkan API Key..."
                     class="w-full bg-black/50 border border-white/10 rounded-lg py-2 px-4 text-white focus:border-gold focus:outline-none transition">
                 <p class="text-xs text-gray-500 mt-1">API Key akan disimpan di R2 (vpsai).</p>
             </div>
 
-            <div class="flex justify-end gap-3">
-                <button onclick="closeSettings()" class="px-4 py-2 text-gray-300 hover:text-white transition">Batal</button>
-                <button onclick="saveSettings()" class="px-6 py-2 bg-gold text-black font-bold rounded-lg hover:bg-white transition flex items-center gap-2">
-                    <i class="fas fa-save"></i> Simpan
-                </button>
+            <div class="flex justify-between gap-3">
+                <button id="resetKeyBtn" onclick="resetSettings()" class="hidden px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition">Reset Default</button>
+                <div class="flex gap-2">
+                    <button onclick="closeSettings()" class="px-4 py-2 text-gray-300 hover:text-white transition">Batal</button>
+                    <button onclick="saveSettings()" class="px-6 py-2 bg-gold text-black font-bold rounded-lg hover:bg-white transition flex items-center gap-2">
+                        <i class="fas fa-save"></i> Simpan
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -339,7 +340,7 @@ const html = `
             }
             imgElement.onload = () => imgElement.classList.remove('animate-pulse', 'bg-gray-800');
             imgElement.onerror = () => {
-                imgElement.onerror = null; // Prevent infinite loop
+                imgElement.onerror = null;
                 imgElement.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMzAwIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iI2ZmZiIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+SW1hZ2UgRXJyb3I8L3RleHQ+PC9zdmc+';
                 imgElement.classList.remove('animate-pulse', 'bg-gray-800');
             };
@@ -355,7 +356,8 @@ const html = `
                 if (data.success && data.data) {
                     currentModData = data.data; renderMods(data.data); renderRecommendations(data.data);
                 } else {
-                    grid.innerHTML = '<p class="text-center text-gray-500 col-span-full">Tidak ada hasil ditemukan.</p>';
+                    const msg = data.message || 'Tidak ada hasil ditemukan.';
+                    grid.innerHTML = \`<p class="text-center text-gray-500 col-span-full">\${msg}</p>\`;
                 }
             } catch (err) {
                 console.error(err); grid.innerHTML = '<p class="text-center text-red-500 col-span-full">Gagal memuat data.</p>';
@@ -539,8 +541,22 @@ const html = `
         function closeModal() { document.getElementById('detailModal').classList.add('hidden'); document.body.style.overflow = ''; document.getElementById('videoPlayer').pause(); }
 
         // Settings Functions
-        function openSettings() {
+        async function openSettings() {
             document.getElementById('settingsModal').classList.remove('hidden');
+            try {
+                const res = await fetch(SETTINGS_API_BASE);
+                const data = await res.json();
+                const statusEl = document.getElementById('apiKeyStatus');
+                if (data.configured) {
+                     statusEl.innerHTML = '<span class="text-green-500 flex items-center gap-1"><i class="fas fa-check-circle"></i> Custom Key Active</span>';
+                     document.getElementById('resetKeyBtn').classList.remove('hidden');
+                } else {
+                     statusEl.innerHTML = '<span class="text-gray-500 flex items-center gap-1"><i class="fas fa-info-circle"></i> Using Default Key</span>';
+                     document.getElementById('resetKeyBtn').classList.add('hidden');
+                }
+            } catch(e) {
+                console.error(e);
+            }
         }
         function closeSettings() {
             document.getElementById('settingsModal').classList.add('hidden');
@@ -553,19 +569,33 @@ const html = `
                 const res = await fetch(SETTINGS_API_BASE, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key })
+                    body: JSON.stringify({ key: key.trim() }) // Trim frontend side too
                 });
                 const data = await res.json();
                 if(data.success) {
                     alert('API Key berhasil disimpan di R2!');
                     closeSettings();
-                    window.location.reload(); // Reload to use new key
+                    window.location.reload();
                 } else {
                     alert('Gagal menyimpan: ' + (data.message || 'Error unknown'));
                 }
             } catch (e) {
                 alert('Gagal menyimpan: ' + e.message);
             }
+        }
+        async function resetSettings() {
+            if(!confirm('Kembali ke Default Key? (Key di R2 akan dihapus)')) return;
+            try {
+                const res = await fetch(SETTINGS_API_BASE, { method: 'DELETE' });
+                const data = await res.json();
+                if(data.success) {
+                    alert('API Key direset ke Default!');
+                    closeSettings();
+                    window.location.reload();
+                } else {
+                    alert('Gagal reset: ' + data.message);
+                }
+            } catch(e) { alert('Error: ' + e.message); }
         }
 
         document.getElementById('menuBtn').addEventListener('click', toggleSidebar);
@@ -585,13 +615,15 @@ export default {
     // --- Key Management ---
     // Try to get key from R2 first, then Env, then Default
     let API_KEY_VAL = null;
+    let isCustomKey = false;
 
     // Check R2
     if (env.BUCKET) {
         try {
             const obj = await env.BUCKET.get('API_KEY');
             if (obj) {
-                API_KEY_VAL = await obj.text();
+                API_KEY_VAL = (await obj.text()).trim();
+                isCustomKey = true;
             }
         } catch (e) {
             console.error('Failed to read from R2', e);
@@ -603,18 +635,37 @@ export default {
         API_KEY_VAL = env.API_KEY || DEFAULT_API_KEY;
     }
 
-    // Handle Settings Save
-    if (url.pathname === '/api/settings' && request.method === 'POST') {
+    // Handle Settings Save/Check/Reset
+    if (url.pathname === '/api/settings') {
         if (!env.BUCKET) return new Response(JSON.stringify({ success: false, message: 'R2 Bucket not configured' }), { headers: {'content-type': 'application/json'} });
-        try {
-            const body = await request.json();
-            if(body.key) {
-                await env.BUCKET.put('API_KEY', body.key);
-                return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
+
+        // GET: Check status
+        if (request.method === 'GET') {
+             return new Response(JSON.stringify({ configured: isCustomKey }), { headers: {'content-type': 'application/json'} });
+        }
+
+        // POST: Save
+        if (request.method === 'POST') {
+            try {
+                const body = await request.json();
+                if(body.key) {
+                    await env.BUCKET.put('API_KEY', body.key.trim());
+                    return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
+                }
+                return new Response(JSON.stringify({ success: false, message: 'Missing key' }), { headers: {'content-type': 'application/json'} });
+            } catch(e) {
+                return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
             }
-            return new Response(JSON.stringify({ success: false, message: 'Missing key' }), { headers: {'content-type': 'application/json'} });
-        } catch(e) {
-             return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
+        }
+
+        // DELETE: Reset
+        if (request.method === 'DELETE') {
+             try {
+                await env.BUCKET.delete('API_KEY');
+                return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
+             } catch(e) {
+                return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
+             }
         }
     }
 

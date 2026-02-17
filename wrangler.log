@@ -26,3 +26,9 @@ env.BUCKET (vpsai)      R2 Bucket      local
 ⎔ Local server updated and ready
 ⎔ Reloading local server...
 ⎔ Local server updated and ready
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[wrangler:info] HEAD / 200 OK (52ms)
+[wrangler:info] GET / 200 OK (33ms)
+[wrangler:info] GET /api/mod 200 OK (1994ms)
+[wrangler:info] GET /api/settings 200 OK (16ms)
