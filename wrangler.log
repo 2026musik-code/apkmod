@@ -1,0 +1,6 @@
+
+ ⛅️ wrangler 4.65.0
+───────────────────
+⎔ Starting local server...
+[wrangler:info] Ready on http://localhost:8787
+[wrangler:info] GET / 200 OK (6ms)
