@@ -689,6 +689,14 @@ export default {
         const query = url.searchParams.get('query') || 'Michat';
         const apiUrl = `https://api.ferdev.my.id/search/getmodsapk?query=${query}&apikey=${API_KEY_VAL}`;
         const response = await fetch(apiUrl, { headers: upstreamHeaders });
+
+        // Log error if any (to help debug blocking)
+        if (!response.ok) {
+            const txt = await response.text();
+            console.error(`Upstream API Error [${response.status}]: ${txt.substring(0, 200)}`);
+            return new Response(JSON.stringify({ success: false, message: 'Upstream Error: ' + response.status }), { headers: { 'content-type': 'application/json' } });
+        }
+
         return new Response(response.body, { headers: { 'content-type': 'application/json' } });
     }
     if (url.pathname === '/api/drakor') {
