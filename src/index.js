@@ -678,29 +678,35 @@ export default {
         }
     }
 
+    // Common headers for upstream to avoid IP/UA blocking
+    const upstreamHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*'
+    };
+
     // --- API Proxies ---
     if (url.pathname === '/api/mod') {
         const query = url.searchParams.get('query') || 'Michat';
         const apiUrl = `https://api.ferdev.my.id/search/getmodsapk?query=${query}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, { headers: upstreamHeaders });
         return new Response(response.body, { headers: { 'content-type': 'application/json' } });
     }
     if (url.pathname === '/api/drakor') {
         const query = url.searchParams.get('query') || 'CEO';
         const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${query}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, { headers: upstreamHeaders });
         return new Response(response.body, { headers: { 'content-type': 'application/json' } });
     }
     if (url.pathname === '/api/detail') {
         const bookId = url.searchParams.get('bookId');
         const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, { headers: upstreamHeaders });
         return new Response(response.body, { headers: { 'content-type': 'application/json' } });
     }
     if (url.pathname === '/api/stream') {
         const videoId = url.searchParams.get('videoId');
         const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, { headers: upstreamHeaders });
         return new Response(response.body, { headers: { 'content-type': 'application/json' } });
     }
 
