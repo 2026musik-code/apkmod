@@ -1,38 +1,26 @@
 
+const API_KEY = 'dedi131'; // In a real app, use env.API_KEY
+
 const html = `
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
     <title>MOD APPS - Premium Modded APKs & Drakor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/js/all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        /* Custom Scrollbar for horizontal scrolling */
-        .hide-scroll-bar::-webkit-scrollbar {
-            display: none;
-        }
-        .hide-scroll-bar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        /* Smooth scrolling */
-        html {
-            scroll-behavior: smooth;
-        }
-        /* Glassmorphism */
-        .glass {
-            background: rgba(30, 30, 30, 0.6);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        /* Aspect Ratio for posters */
-        .aspect-poster {
-            aspect-ratio: 2 / 3;
-        }
+        .hide-scroll-bar::-webkit-scrollbar { display: none; }
+        .hide-scroll-bar { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1a1a1a; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 4px; }
+        html { scroll-behavior: smooth; }
+        .aspect-poster { aspect-ratio: 2 / 3; }
     </style>
     <script>
         tailwind.config = {
@@ -68,7 +56,6 @@ const html = `
                 </div>
             </div>
 
-             <!-- Search Bar (Mod Apps Only) -->
             <div id="searchContainer" class="hidden md:flex flex-1 max-w-md mx-4">
                 <div class="relative w-full">
                     <input type="text" id="searchInput" placeholder="Cari aplikasi..."
@@ -172,13 +159,11 @@ const html = `
 
         <!-- Categories Rows -->
         <div class="space-y-8 px-4 pb-20">
-            <!-- Sections will be injected here -->
              <div id="drakorContent"></div>
         </div>
-
     </main>
 
-    <!-- Detail Modal (Drakor) -->
+    <!-- Detail Modal -->
     <div id="detailModal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
 
@@ -189,18 +174,21 @@ const html = `
                     <i class="fas fa-times"></i>
                 </button>
 
-                <!-- Player Container -->
+                <!-- Player -->
                  <div id="playerContainer" class="w-full aspect-video bg-black hidden relative group">
-                    <video id="videoPlayer" class="w-full h-full" controls poster="">
-                        <source src="" type="video/mp4">
+                    <video id="videoPlayer" class="w-full h-full" controls poster="" playsinline webkit-playsinline>
                         Your browser does not support the video tag.
                     </video>
-                     <!-- Fake overlay for demo if no real source -->
-                     <div id="playerOverlay" class="absolute inset-0 flex items-center justify-center bg-black/50 hidden">
-                        <div class="text-center">
-                             <i class="fas fa-exclamation-triangle text-gold text-4xl mb-2"></i>
-                             <p class="text-white">Video Source Unavailable via API</p>
-                        </div>
+                     <!-- Loading -->
+                     <div id="playerLoading" class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 hidden z-20">
+                        <i class="fas fa-circle-notch fa-spin text-gold text-4xl mb-2"></i>
+                        <p class="text-white text-sm">Memuat Video...</p>
+                     </div>
+                      <!-- Error -->
+                     <div id="playerError" class="absolute inset-0 flex flex-col items-center justify-center bg-black/90 hidden z-20 px-4 text-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-2"></i>
+                        <p class="text-white text-sm mb-2" id="playerErrorMsg">Gagal memuat video.</p>
+                        <button onclick="retryVideo()" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-sm text-white">Coba Lagi</button>
                      </div>
                 </div>
 
@@ -210,7 +198,6 @@ const html = `
                         <img id="modalPoster" src="" class="w-full h-full object-cover opacity-80">
                         <div class="absolute inset-0 bg-gradient-to-t from-[#181818] to-transparent"></div>
                     </div>
-
                     <!-- Content Side -->
                     <div class="p-6 md:py-8 space-y-6">
                         <!-- Mobile Header -->
@@ -239,9 +226,7 @@ const html = `
                              <p id="modalSynopsis" class="text-gray-300 text-sm leading-relaxed line-clamp-4 hover:line-clamp-none cursor-pointer transition">
                                 Synopsis...
                             </p>
-                             <div id="modalTags" class="mt-3 flex flex-wrap gap-2">
-                                <!-- Tags -->
-                            </div>
+                             <div id="modalTags" class="mt-3 flex flex-wrap gap-2"></div>
                         </div>
 
                         <!-- Episode Selector -->
@@ -249,9 +234,10 @@ const html = `
                             <h3 class="text-white font-bold mb-3 flex items-center gap-2">
                                 <i class="fas fa-list-ul text-gold"></i> Episodes
                             </h3>
-                            <div id="episodeGrid" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                <!-- Episode Buttons -->
+                            <div id="episodeGridLoading" class="hidden text-center py-4">
+                                <i class="fas fa-spinner fa-spin text-gold"></i>
                             </div>
+                            <div id="episodeGrid" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar"></div>
                         </div>
                     </div>
                 </div>
@@ -260,19 +246,22 @@ const html = `
     </div>
 
     <script>
-        const API_KEY = 'dedi131';
-        const MOD_API_BASE = 'https://api.ferdev.my.id/search/getmodsapk';
-        const DRAKOR_API_BASE = 'https://api.ferdev.my.id/internet/melolo/search';
+        // Use local proxy paths
+        const MOD_API_BASE = '/api/mod';
+        const DRAKOR_API_BASE = '/api/drakor';
+        const DETAIL_API_BASE = '/api/detail';
+        const STREAM_API_BASE = '/api/stream';
+        const PROXY_VIDEO_BASE = '/api/proxy-video';
 
         let currentModData = [];
-        let drakorData = {}; // Store fetched drakor data by category
+        let drakorData = {};
+        let currentChapters = [];
+        let currentPlayingVideoId = null;
 
-        // --- Utils ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('overlay');
             const isOpen = !sidebar.classList.contains('-translate-x-full');
-
             if (isOpen) {
                 sidebar.classList.add('-translate-x-full');
                 overlay.classList.add('hidden');
@@ -283,99 +272,58 @@ const html = `
         }
 
         function switchPage(page) {
-            console.log('Switching page to:', page);
             toggleSidebar();
             const modPage = document.getElementById('modPage');
             const drakorPage = document.getElementById('drakorPage');
-
             if (page === 'home') {
-                modPage.classList.remove('hidden');
-                modPage.classList.remove('opacity-0');
+                modPage.classList.remove('hidden'); modPage.classList.remove('opacity-0');
                 drakorPage.classList.add('hidden');
-                document.getElementById('searchContainer').classList.remove('hidden'); // Show search
+                document.getElementById('searchContainer').classList.remove('hidden');
             } else {
                 modPage.classList.add('opacity-0');
                 setTimeout(() => modPage.classList.add('hidden'), 300);
                 drakorPage.classList.remove('hidden');
-                document.getElementById('searchContainer').classList.add('hidden'); // Hide search
-
-                // Initialize Drakor if empty
-                if (Object.keys(drakorData).length === 0) {
-                    console.log('Initializing Drakor content...');
-                    initDrakor();
-                } else {
-                    console.log('Drakor content already loaded.');
-                }
+                document.getElementById('searchContainer').classList.add('hidden');
+                if (Object.keys(drakorData).length === 0) initDrakor();
             }
         }
 
-        // --- Image Handling (HEIC to Blob) ---
         async function loadImage(url, imgElement) {
             if (!url) return;
-            // console.log('Loading image:', url);
-
-            // Placeholder while loading
             imgElement.classList.add('animate-pulse', 'bg-gray-800');
-
-            // Check if HEIC
             if (url.toLowerCase().includes('.heic')) {
                 try {
-                    // Fetch blob
                     const response = await fetch(url);
                     if (!response.ok) throw new Error('Network response was not ok');
                     const blob = await response.blob();
-
-                    // Convert
-                    const conversionResult = await heic2any({
-                        blob,
-                        toType: "image/jpeg",
-                        quality: 0.8
-                    });
-
+                    const conversionResult = await heic2any({ blob, toType: "image/jpeg", quality: 0.8 });
                     const conversionUrl = URL.createObjectURL(conversionResult);
                     imgElement.src = conversionUrl;
-                    imgElement.classList.remove('animate-pulse', 'bg-gray-800');
-                    // console.log('Converted HEIC:', conversionUrl);
                 } catch (e) {
-                    console.error("Image load failed", e);
                     imgElement.src = 'https://via.placeholder.com/200x300?text=No+Image';
-                    imgElement.classList.remove('animate-pulse', 'bg-gray-800');
                 }
             } else {
                 imgElement.src = url;
-                imgElement.onload = () => imgElement.classList.remove('animate-pulse', 'bg-gray-800');
-                imgElement.onerror = () => {
-                     imgElement.src = 'https://via.placeholder.com/200x300?text=Error';
-                     imgElement.classList.remove('animate-pulse', 'bg-gray-800');
-                };
             }
+            imgElement.onload = () => imgElement.classList.remove('animate-pulse', 'bg-gray-800');
+            imgElement.onerror = () => { imgElement.src = 'https://via.placeholder.com/200x300?text=Error'; imgElement.classList.remove('animate-pulse', 'bg-gray-800'); };
         }
 
-        // --- Mod Apps Logic ---
         async function fetchMods(query = 'Michat') {
             const grid = document.getElementById('modGrid');
             const loading = document.getElementById('loading');
-
-            grid.innerHTML = '';
-            loading.classList.remove('hidden');
-
+            grid.innerHTML = ''; loading.classList.remove('hidden');
             try {
-                const res = await fetch(\`\${MOD_API_BASE}?query=\${query}&apikey=\${API_KEY}\`);
+                const res = await fetch(\`\${MOD_API_BASE}?query=\${query}\`);
                 const data = await res.json();
-
                 if (data.success && data.data) {
-                    currentModData = data.data;
-                    renderMods(data.data);
-                    renderRecommendations(data.data);
+                    currentModData = data.data; renderMods(data.data); renderRecommendations(data.data);
                 } else {
                     grid.innerHTML = '<p class="text-center text-gray-500 col-span-full">Tidak ada hasil ditemukan.</p>';
                 }
             } catch (err) {
-                console.error(err);
-                grid.innerHTML = '<p class="text-center text-red-500 col-span-full">Gagal memuat data.</p>';
-            } finally {
-                loading.classList.add('hidden');
-            }
+                console.error(err); grid.innerHTML = '<p class="text-center text-red-500 col-span-full">Gagal memuat data.</p>';
+            } finally { loading.classList.add('hidden'); }
         }
 
         function renderMods(mods) {
@@ -384,297 +332,179 @@ const html = `
                 <div class="bg-card rounded-xl overflow-hidden border border-white/5 hover:border-gold/50 transition group hover:shadow-lg hover:shadow-gold/10">
                     <div class="relative h-40 overflow-hidden">
                         <img src="\${mod.image}" alt="\${mod.title}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
-                        <div class="absolute top-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-xs text-gold border border-gold/20">
-                            \${mod.version}
-                        </div>
+                        <div class="absolute top-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-xs text-gold border border-gold/20">\${mod.version}</div>
                     </div>
                     <div class="p-4">
                         <h3 class="font-bold text-white mb-1 truncate">\${mod.title}</h3>
                         <p class="text-xs text-gray-400 mb-3 truncate">\${mod.modFeature}</p>
-                        <a href="\${mod.link}" target="_blank" class="block w-full py-2 bg-white/5 hover:bg-gold hover:text-black text-center rounded-lg text-sm font-semibold transition border border-white/10 hover:border-transparent">
-                            Download <i class="fas fa-download ml-1"></i>
-                        </a>
+                        <a href="\${mod.link}" target="_blank" class="block w-full py-2 bg-white/5 hover:bg-gold hover:text-black text-center rounded-lg text-sm font-semibold transition border border-white/10 hover:border-transparent">Download <i class="fas fa-download ml-1"></i></a>
                     </div>
-                </div>
-            \`).join('');
+                </div>\`).join('');
         }
 
         function renderRecommendations(mods) {
             const container = document.getElementById('recommendedContainer');
-            // Show only first 6 as recommendations
-            const recs = mods.slice(0, 6);
-
-            container.innerHTML = recs.map(mod => \`
+            container.innerHTML = mods.slice(0, 6).map(mod => \`
                 <div class="snap-start shrink-0 w-[80vw] sm:w-[300px] bg-gradient-to-br from-gray-800 to-black rounded-2xl p-4 border border-white/10 flex items-center gap-4 relative overflow-hidden group">
                     <div class="absolute inset-0 bg-gold/5 opacity-0 group-hover:opacity-100 transition"></div>
                     <img src="\${mod.image}" class="w-20 h-20 rounded-xl object-cover shadow-lg z-10">
                     <div class="z-10 min-w-0 flex-1">
                         <h3 class="font-bold text-lg text-white truncate">\${mod.title}</h3>
                         <p class="text-xs text-gold mb-2">\${mod.size}</p>
-                        <a href="\${mod.link}" target="_blank" class="inline-block px-4 py-1.5 bg-gold text-black text-xs font-bold rounded-full hover:bg-white transition">
-                            GET MOD
-                        </a>
+                        <a href="\${mod.link}" target="_blank" class="inline-block px-4 py-1.5 bg-gold text-black text-xs font-bold rounded-full hover:bg-white transition">GET MOD</a>
                     </div>
-                </div>
-            \`).join('');
+                </div>\`).join('');
         }
 
-        function filterMods(category) {
-            if (category === 'All') fetchMods('Michat'); // Reset
-            else fetchMods(category);
-        }
+        function filterMods(category) { category === 'All' ? fetchMods('Michat') : fetchMods(category); }
 
-        // --- Drakor Logic ---
         const drakorCategories = ['CEO', 'Romantis', 'Aksi', 'Fantasi', 'Sekolah', 'Kerajaan'];
-
         async function initDrakor() {
-            console.log('Starting initDrakor...');
             const container = document.getElementById('drakorContent');
-            if(!container) {
-                console.error('Drakor content container not found!');
-                return;
-            }
             container.innerHTML = '<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-4xl text-gold"></i></div>';
-
             try {
-                // Fetch all categories in parallel
-                console.log('Fetching categories:', drakorCategories);
-                const promises = drakorCategories.map(cat =>
-                    fetch(\`\${DRAKOR_API_BASE}?query=\${cat}&apikey=\${API_KEY}\`)
-                        .then(res => {
-                            if (!res.ok) throw new Error(\`HTTP error! status: \${res.status}\`);
-                            return res.json();
-                        })
-                        .then(data => ({ category: cat, data: data }))
-                        .catch(err => {
-                            console.error(\`Failed to fetch \${cat}: \`, err);
-                            return { category: cat, data: [] }; // Fallback to empty
-                        })
-                );
-
-                const results = await Promise.all(promises);
-                console.log('Fetch results:', results);
-                container.innerHTML = ''; // Clear loading
-
+                const results = await Promise.all(drakorCategories.map(cat =>
+                    fetch(\`\${DRAKOR_API_BASE}?query=\${cat}\`).then(res => res.json()).then(data => ({ category: cat, data: data })).catch(() => ({ category: cat, data: [] }))
+                ));
+                container.innerHTML = '';
                 results.forEach(result => {
-                    // Normalize API data
-                    // Mod Search: res.data
-                    // Drakor Search: res.result (based on logs)
                     const items = result.data.result || result.data.data;
-
                     if (items && Array.isArray(items) && items.length > 0) {
-                        drakorData[result.category] = items;
-                        renderDrakorCategory(result.category, items);
-                    } else {
-                        console.warn(\`No data for \${result.category}\`, result.data);
+                        drakorData[result.category] = items; renderDrakorCategory(result.category, items);
                     }
                 });
-
-                // Setup Hero with first item of 'CEO'
-                if (drakorData['CEO'] && drakorData['CEO'].length > 0) {
-                    setupHero(drakorData['CEO'][0]);
-                } else {
-                    console.warn('CEO data missing for Hero, trying first available category');
-                    const firstCat = Object.keys(drakorData)[0];
-                    if (firstCat && drakorData[firstCat].length > 0) {
-                        setupHero(drakorData[firstCat][0]);
-                    }
-                }
-
-            } catch (e) {
-                console.error('initDrakor failed:', e);
-                container.innerHTML = '<p class="text-center text-red-500">Gagal memuat drakor. Periksa koneksi atau API Key.</p>';
-            }
+                if (drakorData['CEO'] && drakorData['CEO'].length > 0) setupHero(drakorData['CEO'][0]);
+            } catch (e) { container.innerHTML = '<p class="text-center text-red-500">Gagal memuat drakor.</p>'; }
         }
 
         function renderDrakorCategory(category, items) {
             const container = document.getElementById('drakorContent');
-
-            // Create Section
             const section = document.createElement('div');
             section.className = 'relative group';
-            section.innerHTML = \`
-                <h3 class="text-lg md:text-xl font-bold text-white mb-3 pl-2 border-l-4 border-gold">\${category}</h3>
-                <div class="relative">
-                    <div class="grid grid-rows-2 grid-flow-col gap-4 overflow-x-auto pb-4 hide-scroll-bar scroll-pl-4 snap-x" id="list-\${category}">
-                        <!-- Items injected here -->
-                    </div>
-                </div>
-            \`;
-
+            section.innerHTML = \`<h3 class="text-lg md:text-xl font-bold text-white mb-3 pl-2 border-l-4 border-gold">\${category}</h3><div class="relative"><div class="grid grid-rows-2 grid-flow-col gap-4 overflow-x-auto pb-4 hide-scroll-bar scroll-pl-4 snap-x" id="list-\${category}"></div></div>\`;
             container.appendChild(section);
-
             const list = section.querySelector(\`#list-\${category}\`);
-
-            items.forEach((item, index) => {
+            items.forEach((item) => {
                 const card = document.createElement('div');
                 card.className = 'snap-start shrink-0 w-[140px] md:w-[180px] cursor-pointer group/card relative transition transform hover:scale-105 hover:z-10 duration-300';
                 card.onclick = () => openDetail(item);
-
                 const imgContainer = document.createElement('div');
                 imgContainer.className = 'aspect-poster bg-gray-800 rounded-lg overflow-hidden relative shadow-lg';
-
                 const img = document.createElement('img');
                 img.className = 'w-full h-full object-cover transition duration-500 group-hover/card:brightness-75';
-                img.alt = item.title;
-
-                // Use our smart loader
                 loadImage(item.cover, img);
-
-                // Play Icon Overlay
-                const playOverlay = document.createElement('div');
-                playOverlay.className = 'absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition duration-300';
-                playOverlay.innerHTML = '<i class="fas fa-play-circle text-5xl text-gold drop-shadow-lg"></i>';
-
+                imgContainer.innerHTML = \`<img src="\${img.src}" class="w-full h-full object-cover transition duration-500 group-hover/card:brightness-75"><div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition duration-300"><i class="fas fa-play-circle text-5xl text-gold drop-shadow-lg"></i></div>\`;
+                // Need to re-apply load image to the new innerHTML img or just append
+                imgContainer.innerHTML = '';
                 imgContainer.appendChild(img);
+                const playOverlay = document.createElement('div'); playOverlay.className = 'absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition duration-300'; playOverlay.innerHTML = '<i class="fas fa-play-circle text-5xl text-gold drop-shadow-lg"></i>';
                 imgContainer.appendChild(playOverlay);
-
-                // Title
-                const title = document.createElement('h4');
-                title.className = 'mt-2 text-sm text-gray-300 font-medium truncate group-hover/card:text-white transition';
-                title.innerText = item.title;
-
-                card.appendChild(imgContainer);
-                card.appendChild(title);
-                list.appendChild(card);
+                const title = document.createElement('h4'); title.className = 'mt-2 text-sm text-gray-300 font-medium truncate group-hover/card:text-white transition'; title.innerText = item.title;
+                card.appendChild(imgContainer); card.appendChild(title); list.appendChild(card);
             });
         }
 
         function setupHero(item) {
-            const hero = document.getElementById('drakorHero');
-            const img = document.getElementById('heroImage');
-            const title = document.getElementById('heroTitle');
-            const synopsis = document.getElementById('heroSynopsis');
-
-            hero.classList.remove('hidden');
-            loadImage(item.cover, img);
-            title.innerText = item.title;
-            synopsis.innerText = item.sinopsis || 'No synopsis available.';
-
-            // Bind buttons
+            const hero = document.getElementById('drakorHero'); hero.classList.remove('hidden');
+            loadImage(item.cover, document.getElementById('heroImage'));
+            document.getElementById('heroTitle').innerText = item.title;
+            document.getElementById('heroSynopsis').innerText = item.sinopsis || 'No synopsis available.';
             window.currentItem = item;
         }
+        function playHero() { if (window.currentItem) openDetail(window.currentItem); }
+        function infoHero() { if (window.currentItem) openDetail(window.currentItem); }
 
-        function playHero() {
-            if (window.currentItem) openDetail(window.currentItem);
-        }
-        function infoHero() {
-             if (window.currentItem) openDetail(window.currentItem);
-        }
-
-        // --- Detail Modal Logic ---
-        function openDetail(item) {
+        async function openDetail(item) {
             const modal = document.getElementById('detailModal');
-            const poster = document.getElementById('modalPoster');
-            const posterMobile = document.getElementById('modalPosterMobile');
-            const titleDesktop = document.getElementById('modalTitleDesktop');
-            const titleMobile = document.getElementById('modalTitle');
-            const synopsis = document.getElementById('modalSynopsis');
-            const tags = document.getElementById('modalTags');
-            const episodeGrid = document.getElementById('episodeGrid');
-            const statusDesktop = document.getElementById('modalStatusDesktop');
-            const statusMobile = document.getElementById('modalStatus');
-            const chaptersDesktop = document.getElementById('modalChaptersDesktop');
-            const chaptersMobile = document.getElementById('modalChapters');
-
-            // Reset Video
-            const playerContainer = document.getElementById('playerContainer');
-            const video = document.getElementById('videoPlayer');
-            playerContainer.classList.add('hidden');
-            video.pause();
-            video.currentTime = 0;
-
-            // Populate Info
-            loadImage(item.cover, poster);
-            loadImage(item.cover, posterMobile);
-
-            titleDesktop.innerText = item.title;
-            titleMobile.innerText = item.title;
-            synopsis.innerText = item.sinopsis || 'No synopsis available.';
-
-            statusDesktop.innerText = item.status || 'Ongoing';
-            statusMobile.innerText = item.status || 'Ongoing';
-
+            loadImage(item.cover, document.getElementById('modalPoster'));
+            loadImage(item.cover, document.getElementById('modalPosterMobile'));
+            document.getElementById('modalTitleDesktop').innerText = item.title;
+            document.getElementById('modalTitle').innerText = item.title;
+            document.getElementById('modalSynopsis').innerText = item.sinopsis || 'No synopsis available.';
+            document.getElementById('modalStatusDesktop').innerText = item.status || 'Ongoing';
+            document.getElementById('modalStatus').innerText = item.status || 'Ongoing';
             const totalEps = parseInt(item.total_chapters) || 0;
-            chaptersDesktop.innerText = \`\${totalEps} Episodes\`;
-            chaptersMobile.innerText = \`\${totalEps} Episodes\`;
+            document.getElementById('modalChaptersDesktop').innerText = \`\${totalEps} Episodes\`;
+            document.getElementById('modalChapters').innerText = \`\${totalEps} Episodes\`;
+            document.getElementById('playerContainer').classList.add('hidden');
+            const video = document.getElementById('videoPlayer'); video.pause(); video.removeAttribute('src');
+            document.getElementById('episodeGrid').innerHTML = '';
+            document.getElementById('episodeGridLoading').classList.remove('hidden');
+            modal.classList.remove('hidden'); document.body.style.overflow = 'hidden';
 
-            // Tags
-            tags.innerHTML = '';
-            if (item.tags && Array.isArray(item.tags)) {
-                // Sometimes tags is a string in array ["Tag1, Tag2"]
-                let tagList = item.tags;
-                if (tagList.length === 1 && tagList[0].includes(',')) {
-                    tagList = tagList[0].split(',').map(t => t.trim());
+            try {
+                const res = await fetch(\`\${DETAIL_API_BASE}?bookId=\${item.book_id}\`);
+                const data = await res.json();
+                if (data.success && data.result) {
+                    if (Array.isArray(data.result)) currentChapters = data.result;
+                    else if (data.result.episodes && Array.isArray(data.result.episodes)) currentChapters = data.result.episodes;
+                    else currentChapters = [];
+                    currentChapters.length > 0 ? renderEpisodeGrid(currentChapters) : document.getElementById('episodeGrid').innerHTML = '<p class="col-span-full text-center text-gray-500">Tidak ada episode.</p>';
+                } else {
+                     document.getElementById('episodeGrid').innerHTML = '<p class="col-span-full text-center text-gray-500">Tidak ada episode.</p>';
                 }
+            } catch (err) {
+                document.getElementById('episodeGrid').innerHTML = '<p class="col-span-full text-center text-red-500">Gagal memuat episode.</p>';
+            } finally { document.getElementById('episodeGridLoading').classList.add('hidden'); }
+        }
 
-                tagList.forEach(tag => {
-                    const span = document.createElement('span');
-                    span.className = 'text-xs bg-white/10 px-2 py-1 rounded text-gray-300';
-                    span.innerText = tag;
-                    tags.appendChild(span);
-                });
-            }
-
-            // Episodes
-            episodeGrid.innerHTML = '';
-            for (let i = 1; i <= totalEps; i++) {
+        function renderEpisodeGrid(chapters) {
+            const grid = document.getElementById('episodeGrid'); grid.innerHTML = '';
+            chapters.sort((a, b) => a.episode - b.episode);
+            chapters.forEach((chapter) => {
                 const btn = document.createElement('button');
                 btn.className = 'aspect-square bg-card border border-white/10 hover:border-gold hover:bg-white/10 rounded flex items-center justify-center text-gray-300 font-semibold text-sm transition focus:ring-2 focus:ring-gold focus:outline-none';
-                btn.innerText = i;
-                btn.onclick = () => playEpisode(item, i);
-                episodeGrid.appendChild(btn);
-            }
-
-            modal.classList.remove('hidden');
-            document.body.style.overflow = 'hidden'; // Prevent background scroll
+                btn.innerText = chapter.episode;
+                btn.onclick = () => playEpisode(chapter);
+                grid.appendChild(btn);
+            });
         }
 
-        function closeModal() {
-            const modal = document.getElementById('detailModal');
-            modal.classList.add('hidden');
-            document.body.style.overflow = '';
-
-            // Stop video
-            const video = document.getElementById('videoPlayer');
-            video.pause();
-        }
-
-        function playEpisode(item, episodeNum) {
+        async function playEpisode(chapter) {
             const playerContainer = document.getElementById('playerContainer');
             const video = document.getElementById('videoPlayer');
-            const overlay = document.getElementById('playerOverlay');
+            const loading = document.getElementById('playerLoading');
+            const error = document.getElementById('playerError');
+            currentPlayingVideoId = chapter.video_id;
+            playerContainer.classList.remove('hidden'); playerContainer.scrollIntoView({ behavior: 'smooth' });
+            video.pause(); video.src = ""; video.removeAttribute('poster');
+            loading.classList.remove('hidden'); error.classList.add('hidden');
 
-            playerContainer.classList.remove('hidden');
-            playerContainer.scrollIntoView({ behavior: 'smooth' });
+            if(chapter.cover) {
+                 if (chapter.cover.toLowerCase().includes('.heic')) {
+                    fetch(chapter.cover).then(r => r.blob()).then(blob => heic2any({ blob, toType: "image/jpeg", quality: 0.5 })).then(res => video.poster = URL.createObjectURL(res)).catch(() => video.poster = "");
+                 } else video.poster = chapter.cover;
+            }
 
-            // Since we don't have the real API for video source, we use a placeholder logic
-            // In a real app, we would fetch(API + episodeNum) here.
-
-            // For verification purposes: "Ensure video plays"
-            // We load a sample video
-            video.src = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-            video.poster = item.cover; // Use cover as poster
-            video.play();
-
-            // Simulate "Source Unavailable" check for realism if needed,
-            // but the user wants "Ensure video plays", so we let it play.
+            try {
+                const res = await fetch(\`\${STREAM_API_BASE}?videoId=\${chapter.video_id}\`);
+                const data = await res.json();
+                if (data.success && data.result && data.result.length > 0) {
+                    const preferred = data.result.find(r => r.quality === '720p') || data.result.find(r => r.quality === '540p') || data.result[0];
+                    if (preferred && preferred.url) {
+                        const proxyUrl = \`\${PROXY_VIDEO_BASE}?url=\${encodeURIComponent(preferred.url)}\`;
+                        if (Hls.isSupported() && preferred.url.endsWith('.m3u8')) {
+                            const hls = new Hls(); hls.loadSource(proxyUrl); hls.attachMedia(video);
+                            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(e => loading.classList.add('hidden')));
+                        } else {
+                            video.src = proxyUrl;
+                            video.play().catch(e => { console.warn("Autoplay prevented"); loading.classList.add('hidden'); });
+                        }
+                        video.onloadeddata = () => loading.classList.add('hidden');
+                    } else throw new Error('No valid URL');
+                } else throw new Error('No stream result');
+            } catch (err) {
+                console.error(err); loading.classList.add('hidden'); error.classList.remove('hidden');
+                document.getElementById('playerErrorMsg').innerText = "Gagal memuat video: " + err.message;
+            }
         }
-
-        // --- Init ---
+        function retryVideo() { if (currentPlayingVideoId) { const chapter = currentChapters.find(c => c.video_id === currentPlayingVideoId); if(chapter) playEpisode(chapter); } }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); document.body.style.overflow = ''; document.getElementById('videoPlayer').pause(); }
         document.getElementById('menuBtn').addEventListener('click', toggleSidebar);
-        document.getElementById('searchBtn').addEventListener('click', () => {
-            const query = document.getElementById('searchInput').value;
-            if(query) fetchMods(query);
-        });
-        document.getElementById('mobileSearchBtn').addEventListener('click', () => {
-            const query = document.getElementById('mobileSearchInput').value;
-            if(query) fetchMods(query);
-        });
-
-        // Start
+        document.getElementById('searchBtn').addEventListener('click', () => { const q = document.getElementById('searchInput').value; if(q) fetchMods(q); });
+        document.getElementById('mobileSearchBtn').addEventListener('click', () => { const q = document.getElementById('mobileSearchInput').value; if(q) fetchMods(q); });
+        document.getElementById('videoPlayer').addEventListener('error', (e) => { console.error("Video Error", e); document.getElementById('playerLoading').classList.add('hidden'); document.getElementById('playerError').classList.remove('hidden'); });
         fetchMods();
-
     </script>
 </body>
 </html>
@@ -682,10 +512,66 @@ const html = `
 
 export default {
   async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const API_KEY_VAL = env.API_KEY || API_KEY;
+
+    // --- API Proxies ---
+    if (url.pathname === '/api/mod') {
+        const query = url.searchParams.get('query') || 'Michat';
+        const apiUrl = `https://api.ferdev.my.id/search/getmodsapk?query=${query}&apikey=${API_KEY_VAL}`;
+        const response = await fetch(apiUrl);
+        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+    }
+    if (url.pathname === '/api/drakor') {
+        const query = url.searchParams.get('query') || 'CEO';
+        const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${query}&apikey=${API_KEY_VAL}`;
+        const response = await fetch(apiUrl);
+        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+    }
+    if (url.pathname === '/api/detail') {
+        const bookId = url.searchParams.get('bookId');
+        const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${API_KEY_VAL}`;
+        const response = await fetch(apiUrl);
+        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+    }
+    if (url.pathname === '/api/stream') {
+        const videoId = url.searchParams.get('videoId');
+        const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${API_KEY_VAL}`;
+        const response = await fetch(apiUrl);
+        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+    }
+
+    // --- Video Proxy ---
+    if (url.pathname === '/api/proxy-video') {
+        const videoUrl = url.searchParams.get('url');
+        if (!videoUrl) return new Response('Missing URL', { status: 400 });
+
+        try {
+            const vidRes = await fetch(videoUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Referer': 'https://tiktok.com/',
+                }
+            });
+
+            // Stream back with CORS
+            const headers = new Headers(vidRes.headers);
+            headers.set('Access-Control-Allow-Origin', '*');
+            headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+            // Handle range requests if needed (Cloudflare workers handle streaming automatically usually)
+            return new Response(vidRes.body, {
+                status: vidRes.status,
+                statusText: vidRes.statusText,
+                headers: headers
+            });
+        } catch (e) {
+            return new Response('Proxy Error', { status: 502 });
+        }
+    }
+
     return new Response(html, {
-      headers: {
-        'content-type': 'text/html;charset=UTF-8',
-      },
+      headers: { 'content-type': 'text/html;charset=UTF-8' },
     });
   },
 };
