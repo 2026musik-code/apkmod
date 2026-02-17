@@ -1,5 +1,4 @@
 
-const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -204,7 +203,7 @@ const html = `
             loading.classList.remove('hidden');
 
             try {
-                const response = await fetch(\`\${API_URL}?query=\${encodeURIComponent(query)}&apikey=\${API_KEY}\`);
+                const response = await fetch(`${API_URL}?query=${encodeURIComponent(query)}&apikey=${API_KEY}`);
                 const data = await response.json();
 
                 loading.classList.add('hidden');
@@ -231,33 +230,33 @@ const html = `
                 // Fallback image handling
                 const imgUrl = item.image || 'https://via.placeholder.com/300x200?text=No+Image';
 
-                card.innerHTML = \`
+                card.innerHTML = `
                     <div class="relative h-48 overflow-hidden">
-                        <img src="\${imgUrl}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" alt="\${item.title}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-110">
+                        <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" alt="${item.title}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-110">
                         <div class="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-yellow-400 text-xs font-bold px-2 py-1 rounded border border-yellow-500/30">
-                            \${item.version}
+                            ${item.version}
                         </div>
                     </div>
                     <div class="p-6 flex-grow flex flex-col">
-                        <h3 class="text-xl font-bold mb-2 text-white line-clamp-1" title="\${item.title}">\${item.title}</h3>
+                        <h3 class="text-xl font-bold mb-2 text-white line-clamp-1" title="${item.title}">${item.title}</h3>
 
                         <div class="flex items-center text-sm text-gray-400 mb-4 space-x-4">
-                            <span class="flex items-center"><i class="fas fa-hdd mr-1 text-gray-500"></i> \${item.size}</span>
-                            <span class="flex items-center"><i class="fas fa-check-circle mr-1 text-green-500"></i> \${item.status}</span>
+                            <span class="flex items-center"><i class="fas fa-hdd mr-1 text-gray-500"></i> ${item.size}</span>
+                            <span class="flex items-center"><i class="fas fa-check-circle mr-1 text-green-500"></i> ${item.status}</span>
                         </div>
 
                         <div class="mb-6 flex-grow">
                             <p class="text-gray-300 text-sm italic border-l-2 border-yellow-600 pl-3 py-1 bg-white/5 rounded-r">
-                                \${item.modFeature || 'Standard Mod Features'}
+                                ${item.modFeature || 'Standard Mod Features'}
                             </p>
                         </div>
 
-                        <a href="\${item.link}" target="_blank" rel="noopener noreferrer"
+                        <a href="${item.link}" target="_blank" rel="noopener noreferrer"
                            class="btn-luxury text-center py-3 rounded-lg text-sm uppercase tracking-wider font-bold shadow-lg block mt-auto hover:text-black hover:no-underline">
                             <i class="fas fa-download mr-2"></i> Download Now
                         </a>
                     </div>
-                \`;
+                `;
                 resultsContainer.appendChild(card);
             });
         }
@@ -294,13 +293,13 @@ const html = `
         async function fetchRecommendations(category) {
             const list = document.getElementById('recommendedList');
             // specific loading skeleton for carousel
-            list.innerHTML = \`
+            list.innerHTML = `
                 <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
                 <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
-            \`;
+            `;
 
             try {
-                const response = await fetch(\`\${API_URL}?query=\${encodeURIComponent(category)}&apikey=\${API_KEY}\`);
+                const response = await fetch(`${API_URL}?query=${encodeURIComponent(category)}&apikey=${API_KEY}`);
                 const data = await response.json();
 
                 list.innerHTML = '';
@@ -326,24 +325,24 @@ const html = `
 
              const imgUrl = item.image || 'https://via.placeholder.com/300x200?text=No+Image';
 
-             card.innerHTML = \`
+             card.innerHTML = `
                 <div class="relative h-32 overflow-hidden">
-                    <img src="\${imgUrl}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" alt="\${item.title}" class="w-full h-full object-cover">
+                    <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" alt="${item.title}" class="w-full h-full object-cover">
                     <div class="absolute top-1 right-1 bg-black/70 backdrop-blur-md text-yellow-400 text-[10px] font-bold px-1.5 py-0.5 rounded border border-yellow-500/30">
-                        \${item.version}
+                        ${item.version}
                     </div>
                 </div>
                 <div class="p-4 flex-grow flex flex-col">
-                    <h3 class="text-sm font-bold mb-1 text-white line-clamp-1" title="\${item.title}">\${item.title}</h3>
+                    <h3 class="text-sm font-bold mb-1 text-white line-clamp-1" title="${item.title}">${item.title}</h3>
                     <div class="mb-3 flex-grow">
-                         <p class="text-gray-400 text-xs line-clamp-2">\${item.modFeature || 'Modded'}</p>
+                         <p class="text-gray-400 text-xs line-clamp-2">${item.modFeature || 'Modded'}</p>
                     </div>
-                    <a href="\${item.link}" target="_blank" rel="noopener noreferrer"
+                    <a href="${item.link}" target="_blank" rel="noopener noreferrer"
                        class="btn-luxury text-center py-2 rounded text-xs uppercase font-bold shadow-lg block mt-auto hover:text-black hover:no-underline">
                         Download
                     </a>
                 </div>
-             \`;
+             `;
              return card;
         }
 
@@ -405,7 +404,7 @@ const html = `
 
         async function fetchDrakorCategory(query, container) {
             try {
-                const res = await fetch(\`\${DRAKOR_API}?query=\${encodeURIComponent(query)}&apikey=\${API_KEY}\`);
+                const res = await fetch(`${DRAKOR_API}?query=${encodeURIComponent(query)}&apikey=${API_KEY}`);
                 const data = await res.json();
 
                 if (data.success && data.result && data.result.length > 0) {
@@ -430,21 +429,21 @@ const html = `
             // Use cover or fallback
             const cover = item.cover || 'https://via.placeholder.com/140x200?text=No+Cover';
 
-            card.innerHTML = \`
+            card.innerHTML = `
                 <div class="h-[200px] rounded-lg overflow-hidden relative shadow-lg border border-gray-800 group-hover:border-yellow-500 transition-all">
-                    <img src="\${cover}" onerror="this.src='https://via.placeholder.com/140x200?text=Error'" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                    <img src="${cover}" onerror="this.src='https://via.placeholder.com/140x200?text=Error'" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
                     <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black to-transparent p-2">
-                         <span class="text-xs text-yellow-400 font-bold block truncate">\${item.status || 'Ongoing'}</span>
+                         <span class="text-xs text-yellow-400 font-bold block truncate">${item.status || 'Ongoing'}</span>
                     </div>
                 </div>
-                <h4 class="text-gray-300 text-sm mt-2 font-medium line-clamp-2 leading-tight group-hover:text-yellow-500">\${item.title}</h4>
-                <p class="text-gray-500 text-[10px] mt-1">\${item.total_chapters || '?'} Chapters</p>
-            \`;
+                <h4 class="text-gray-300 text-sm mt-2 font-medium line-clamp-2 leading-tight group-hover:text-yellow-500">${item.title}</h4>
+                <p class="text-gray-500 text-[10px] mt-1">${item.total_chapters || '?'} Chapters</p>
+            `;
 
             // Simple click action (maybe expand or link)
             // Since API doesn't give a video link, we'll just link to cover or show alert
             card.onclick = () => {
-                alert(\`Judul: \${item.title}\\nPenulis: \${item.author}\\nSinopsis: \${item.sinopsis}\`);
+                alert(`Judul: ${item.title}\\nPenulis: ${item.author}\\nSinopsis: ${item.sinopsis}`);
             };
 
             return card;
@@ -465,14 +464,3 @@ const html = `
     </script>
 </body>
 </html>
-`;
-
-export default {
-  async fetch(request, env, ctx) {
-    return new Response(html, {
-      headers: {
-        'content-type': 'text/html;charset=UTF-8',
-      },
-    });
-  },
-};
