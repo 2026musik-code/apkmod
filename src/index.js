@@ -250,10 +250,10 @@ const html = `
         async function fetchRecommendations(category) {
             const list = document.getElementById('recommendedList');
             // specific loading skeleton for carousel
-            list.innerHTML = `
+            list.innerHTML = \`
                 <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
                 <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
-            `;
+            \`;
 
             try {
                 const response = await fetch(\`\${API_URL}?query=\${encodeURIComponent(category)}&apikey=\${API_KEY}\`);
