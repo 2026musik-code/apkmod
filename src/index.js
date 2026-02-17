@@ -57,14 +57,20 @@ const html = `
                 </div>
             </div>
 
-            <div id="searchContainer" class="hidden md:flex flex-1 max-w-md mx-4">
-                <div class="relative w-full">
-                    <input type="text" id="searchInput" placeholder="Cari aplikasi..."
-                        class="w-full bg-card border border-white/10 rounded-full py-2 px-4 text-sm focus:outline-none focus:border-gold transition text-white placeholder-gray-500">
-                    <button id="searchBtn" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gold hover:text-white">
-                        <i class="fas fa-search"></i>
-                    </button>
+            <div class="flex items-center gap-4">
+                <div id="searchContainer" class="hidden md:flex max-w-md">
+                    <div class="relative w-full">
+                        <input type="text" id="searchInput" placeholder="Cari aplikasi..."
+                            class="w-full bg-card border border-white/10 rounded-full py-2 px-4 text-sm focus:outline-none focus:border-gold transition text-white placeholder-gray-500">
+                        <button id="searchBtn" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gold hover:text-white">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
                 </div>
+                <!-- Settings Button -->
+                <button onclick="openSettings()" class="text-gray-400 hover:text-gold transition">
+                    <i class="fas fa-cog text-xl"></i>
+                </button>
             </div>
         </div>
     </header>
@@ -246,6 +252,30 @@ const html = `
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeSettings()"></div>
+        <div class="bg-[#181818] w-full max-w-md rounded-xl shadow-2xl overflow-hidden relative p-6 z-10 border border-white/10">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fas fa-cog text-gold"></i> Pengaturan
+            </h3>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-2">API Key</label>
+                <input type="password" id="apiKeyInput" placeholder="Masukkan API Key..."
+                    class="w-full bg-black/50 border border-white/10 rounded-lg py-2 px-4 text-white focus:border-gold focus:outline-none transition">
+                <p class="text-xs text-gray-500 mt-1">API Key akan disimpan di R2 (vpsai).</p>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button onclick="closeSettings()" class="px-4 py-2 text-gray-300 hover:text-white transition">Batal</button>
+                <button onclick="saveSettings()" class="px-6 py-2 bg-gold text-black font-bold rounded-lg hover:bg-white transition flex items-center gap-2">
+                    <i class="fas fa-save"></i> Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Use local proxy paths
         const MOD_API_BASE = '/api/mod';
@@ -253,6 +283,7 @@ const html = `
         const DETAIL_API_BASE = '/api/detail';
         const STREAM_API_BASE = '/api/stream';
         const PROXY_VIDEO_BASE = '/api/proxy-video';
+        const SETTINGS_API_BASE = '/api/settings';
 
         let currentModData = [];
         let drakorData = {};
@@ -506,6 +537,37 @@ const html = `
         }
         function retryVideo() { if (currentPlayingVideoId) { const chapter = currentChapters.find(c => c.video_id === currentPlayingVideoId); if(chapter) playEpisode(chapter); } }
         function closeModal() { document.getElementById('detailModal').classList.add('hidden'); document.body.style.overflow = ''; document.getElementById('videoPlayer').pause(); }
+
+        // Settings Functions
+        function openSettings() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+        async function saveSettings() {
+            const key = document.getElementById('apiKeyInput').value;
+            if(!key) return alert('API Key tidak boleh kosong');
+
+            try {
+                const res = await fetch(SETTINGS_API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    alert('API Key berhasil disimpan di R2!');
+                    closeSettings();
+                    window.location.reload(); // Reload to use new key
+                } else {
+                    alert('Gagal menyimpan: ' + (data.message || 'Error unknown'));
+                }
+            } catch (e) {
+                alert('Gagal menyimpan: ' + e.message);
+            }
+        }
+
         document.getElementById('menuBtn').addEventListener('click', toggleSidebar);
         document.getElementById('searchBtn').addEventListener('click', () => { const q = document.getElementById('searchInput').value; if(q) fetchMods(q); });
         document.getElementById('mobileSearchBtn').addEventListener('click', () => { const q = document.getElementById('mobileSearchInput').value; if(q) fetchMods(q); });
@@ -519,10 +581,50 @@ const html = `
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const API_KEY_VAL = env.API_KEY || DEFAULT_API_KEY;
+
+    // --- Key Management ---
+    // Try to get key from R2 first, then Env, then Default
+    let API_KEY_VAL = null;
+
+    // Check R2
+    if (env.BUCKET) {
+        try {
+            const obj = await env.BUCKET.get('API_KEY');
+            if (obj) {
+                API_KEY_VAL = await obj.text();
+            }
+        } catch (e) {
+            console.error('Failed to read from R2', e);
+        }
+    }
+
+    // Fallback
+    if (!API_KEY_VAL) {
+        API_KEY_VAL = env.API_KEY || DEFAULT_API_KEY;
+    }
+
+    // Handle Settings Save
+    if (url.pathname === '/api/settings' && request.method === 'POST') {
+        if (!env.BUCKET) return new Response(JSON.stringify({ success: false, message: 'R2 Bucket not configured' }), { headers: {'content-type': 'application/json'} });
+        try {
+            const body = await request.json();
+            if(body.key) {
+                await env.BUCKET.put('API_KEY', body.key);
+                return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
+            }
+            return new Response(JSON.stringify({ success: false, message: 'Missing key' }), { headers: {'content-type': 'application/json'} });
+        } catch(e) {
+             return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
+        }
+    }
 
     if (!API_KEY_VAL) {
-        return new Response('API_KEY is not configured', { status: 500 });
+        // If we still have no key, we can't proceed with API calls, but we can load the UI so the user can enter it
+        if (!url.pathname.startsWith('/api/') || url.pathname === '/api/settings') {
+             // Let it pass to load HTML or settings
+        } else {
+             return new Response('API_KEY is not configured. Please use Settings.', { status: 500 });
+        }
     }
 
     // --- API Proxies ---

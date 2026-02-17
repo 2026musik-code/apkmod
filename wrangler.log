@@ -18,3 +18,11 @@
 ⎔ Local server updated and ready
 ⎔ Reloading local server...
 ⎔ Local server updated and ready
+Your Worker has access to the following bindings:
+Binding                 Resource       Mode
+env.BUCKET (vpsai)      R2 Bucket      local
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+⎔ Reloading local server...
+⎔ Local server updated and ready
