@@ -83,8 +83,8 @@ const html = `
         <div class="inline-block p-2 border-b-2 border-yellow-600 mb-4">
             <i class="fas fa-crown text-yellow-500 text-3xl"></i>
         </div>
-        <h1 class="text-5xl md:text-6xl font-bold mb-2 luxury-gradient tracking-wide">MOD APPS</h1>
-        <p class="text-gray-400 text-lg">Premium Selection of Modded Applications</p>
+        <h1 class="text-5xl md:text-6xl font-bold mb-2 luxury-gradient tracking-wide">APLIKASI MODIFIKASI</h1>
+        <p class="text-gray-400 text-lg">Pilihan Aplikasi Modifikasi Premium</p>
     </header>
 
     <!-- Search Section -->
@@ -92,11 +92,11 @@ const html = `
         <div class="absolute inset-0 bg-yellow-500 blur-lg opacity-20 group-hover:opacity-40 transition duration-300 rounded-full"></div>
         <div class="relative flex items-center bg-gray-900 rounded-full border border-gray-700 shadow-2xl overflow-hidden focus-within:border-yellow-500 transition-colors duration-300">
             <i class="fas fa-search text-gray-500 ml-6 text-xl"></i>
-            <input type="text" id="searchInput" placeholder="Search for your favorite mod..."
+            <input type="text" id="searchInput" placeholder="Cari mod favorit..."
                    class="w-full bg-transparent text-white px-4 py-4 focus:outline-none text-lg placeholder-gray-600"
                    onkeydown="if(event.key === 'Enter') searchMods()">
             <button onclick="searchMods()" class="btn-luxury px-8 py-4 rounded-full m-1 hover:scale-105 transform">
-                SEARCH
+                MENCARI
             </button>
         </div>
     </div>
@@ -107,6 +107,7 @@ const html = `
             <button onclick="filterCategory('Viral')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-yellow-600/50 bg-yellow-600/20 text-yellow-500 font-semibold transition-all">Viral</button>
             <button onclick="filterCategory('Chat')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">Chat</button>
             <button onclick="filterCategory('Game')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">Game</button>
+            <button onclick="filterCategory('AI')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">AI</button>
             <button onclick="filterCategory('+18')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">+18</button>
             <button onclick="filterCategory('VPN')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">VPN</button>
             <button onclick="filterCategory('Browser')" class="category-btn whitespace-nowrap px-6 py-2 rounded-full border border-gray-700 hover:border-yellow-600/50 hover:text-yellow-500 text-gray-400 font-semibold transition-all">Browser</button>
@@ -115,7 +116,7 @@ const html = `
 
     <!-- Recommended Section -->
     <div id="recommendedSection" class="w-full max-w-7xl mb-12 px-4">
-        <h2 class="text-2xl font-bold mb-6 text-yellow-500 border-l-4 border-yellow-500 pl-4">Recommended</h2>
+        <h2 class="text-2xl font-bold mb-6 text-yellow-500 border-l-4 border-yellow-500 pl-4">Rekomendasi</h2>
         <div id="recommendedList" class="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 no-scrollbar">
             <!-- Loading placeholders -->
             <div class="min-w-[calc(50%-0.5rem)] md:min-w-[33%] lg:min-w-[25%] shrink-0 snap-center h-64 bg-gray-800/50 rounded-xl animate-pulse"></div>
