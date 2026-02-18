@@ -448,6 +448,7 @@ export default {
         let drakorData = {};
         let currentChapters = [];
         let currentPlayingVideoId = null;
+        let currentPage = 'home';
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -464,8 +465,14 @@ export default {
 
         function switchPage(page) {
             toggleSidebar();
+            currentPage = page;
             const modPage = document.getElementById('modPage');
             const drakorPage = document.getElementById('drakorPage');
+
+            // Update Search Placeholders
+            const placeholder = page === 'drakor' ? 'Cari Drama...' : 'Cari aplikasi...';
+            document.getElementById('searchInput').placeholder = placeholder;
+            document.getElementById('mobileSearchInput').placeholder = placeholder;
 
             window.history.replaceState(null, null, '#' + page);
 
@@ -477,7 +484,7 @@ export default {
                 modPage.classList.add('opacity-0');
                 setTimeout(() => modPage.classList.add('hidden'), 300);
                 drakorPage.classList.remove('hidden');
-                document.getElementById('searchContainer').classList.add('hidden');
+                document.getElementById('searchContainer').classList.remove('hidden'); // Keep search visible!
                 if (Object.keys(drakorData).length === 0) initDrakor();
             }
         }
@@ -578,9 +585,73 @@ export default {
 
         function filterMods(category) { category === 'All' ? fetchMods('Michat') : fetchMods(category); }
 
+        // --- NEW: Context-Aware Search for Drakor ---
+        const handleSearch = () => {
+            const q = document.getElementById('searchInput').value || document.getElementById('mobileSearchInput').value;
+            if (currentPage === 'drakor') {
+                searchDrakor(q);
+            } else {
+                fetchMods(q);
+            }
+        };
+
+        async function searchDrakor(query) {
+            const container = document.getElementById('drakorContent');
+            const hero = document.getElementById('drakorHero');
+
+            hero.classList.add('hidden'); // Hide Hero for results
+            container.innerHTML = '<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-4xl text-gold"></i></div>';
+
+            try {
+                const direct = \`\${DRAKOR_API_BASE}?query=\${query}&apikey=\${ACTIVE_API_KEY}\`;
+                const proxy = \`\${DRAKOR_PROXY}?query=\${query}\`;
+
+                const data = await robustFetch(direct, proxy);
+                const items = data.result || data.data;
+
+                container.innerHTML = '';
+
+                if (items && Array.isArray(items) && items.length > 0) {
+                    // Render Grid
+                    const grid = document.createElement('div');
+                    grid.className = 'grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4';
+
+                    items.forEach((item) => {
+                       const card = document.createElement('div');
+                       card.className = 'cursor-pointer group/card relative transition transform hover:scale-105 hover:z-10 duration-300';
+                       card.onclick = () => openDetail(item);
+                       const imgContainer = document.createElement('div');
+                       imgContainer.className = 'aspect-poster bg-gray-800 rounded-lg overflow-hidden relative shadow-lg';
+                       const img = document.createElement('img');
+                       img.className = 'w-full h-full object-cover transition duration-500 group-hover/card:brightness-75';
+                       loadImage(item.cover, img);
+                       imgContainer.appendChild(img);
+                       const title = document.createElement('h4');
+                       title.className = 'mt-2 text-sm text-gray-300 font-medium truncate group-hover/card:text-white transition';
+                       title.innerText = item.title;
+                       card.appendChild(imgContainer);
+                       card.appendChild(title);
+                       grid.appendChild(card);
+                    });
+
+                    const title = document.createElement('h3');
+                    title.className = 'text-xl font-bold text-white mb-4';
+                    title.innerText = \`Hasil Pencarian: "\${query}"\`;
+                    container.appendChild(title);
+                    container.appendChild(grid);
+                } else {
+                    container.innerHTML = '<p class="text-center text-gray-500">Tidak ada drama ditemukan.</p>';
+                }
+            } catch(e) {
+                container.innerHTML = \`<p class="text-center text-red-500">Pencarian gagal: \${e.message}</p>\`;
+            }
+        }
+
         const drakorCategories = ['CEO', 'Romantis', 'Aksi', 'Fantasi', 'Sekolah', 'Kerajaan'];
         async function initDrakor() {
             const container = document.getElementById('drakorContent');
+            const hero = document.getElementById('drakorHero');
+            hero.classList.remove('hidden'); // Show Hero again
             container.innerHTML = '<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-4xl text-gold"></i></div>';
             try {
                 const results = await Promise.all(drakorCategories.map(cat => {
@@ -694,7 +765,10 @@ export default {
             currentPlayingVideoId = chapter.video_id;
             playerContainer.classList.remove('hidden'); playerContainer.scrollIntoView({ behavior: 'smooth' });
             video.pause(); video.src = ""; video.removeAttribute('poster');
-            loading.classList.remove('hidden'); error.classList.add('hidden');
+
+            // Reset states
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
 
             if(chapter.cover) {
                  if (chapter.cover.toLowerCase().includes('.heic')) {
@@ -819,9 +893,11 @@ export default {
         }
 
         document.getElementById('menuBtn').addEventListener('click', toggleSidebar);
-        document.getElementById('searchBtn').addEventListener('click', () => { const q = document.getElementById('searchInput').value; if(q) fetchMods(q); });
-        document.getElementById('mobileSearchBtn').addEventListener('click', () => { const q = document.getElementById('mobileSearchInput').value; if(q) fetchMods(q); });
-        fetchMods();
+        // Updated Listeners to use context-aware handler
+        document.getElementById('searchBtn').addEventListener('click', handleSearch);
+        document.getElementById('mobileSearchBtn').addEventListener('click', handleSearch);
+
+        document.getElementById('videoPlayer').addEventListener('error', (e) => { console.error("Video Error", e); document.getElementById('playerLoading').classList.add('hidden'); document.getElementById('playerError').classList.remove('hidden'); });
     </script>
 </body>
 </html>
