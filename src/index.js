@@ -603,7 +603,10 @@ export default {
             currentPlayingVideoId = chapter.video_id;
             playerContainer.classList.remove('hidden'); playerContainer.scrollIntoView({ behavior: 'smooth' });
             video.pause(); video.src = ""; video.removeAttribute('poster');
-            loading.classList.remove('hidden'); error.classList.add('hidden');
+
+            // Reset states
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
 
             if(chapter.cover) {
                  if (chapter.cover.toLowerCase().includes('.heic')) {
@@ -618,12 +621,11 @@ export default {
                 if (data.success && data.result && data.result.length > 0) {
                     const preferred = data.result.find(r => r.quality === '720p') || data.result.find(r => r.quality === '540p') || data.result[0];
                     if (preferred && preferred.url) {
-                        // Use Proxy for the Video Content itself if needed, OR try direct if possible.
-                        // Ideally we try direct first, but we don't know if the video host allows CORS.
-                        // Safe bet: Use proxy for video content, but key is already handled.
                         const proxyUrl = \`\${PROXY_VIDEO_BASE}?url=\${encodeURIComponent(preferred.url)}\`;
                         if (Hls.isSupported() && preferred.url.endsWith('.m3u8')) {
-                            const hls = new Hls(); hls.loadSource(proxyUrl); hls.attachMedia(video);
+                            const hls = new Hls();
+                            hls.loadSource(proxyUrl);
+                            hls.attachMedia(video);
                             hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(e => loading.classList.add('hidden')));
                         } else {
                             video.src = proxyUrl;
@@ -639,6 +641,38 @@ export default {
         }
         function retryVideo() { if (currentPlayingVideoId) { const chapter = currentChapters.find(c => c.video_id === currentPlayingVideoId); if(chapter) playEpisode(chapter); } }
         function closeModal() { document.getElementById('detailModal').classList.add('hidden'); document.body.style.overflow = ''; document.getElementById('videoPlayer').pause(); }
+
+        // --- NEW: Handle Video State Logic to clear errors on play ---
+        const vPlayer = document.getElementById('videoPlayer');
+
+        vPlayer.addEventListener('playing', () => {
+            // Video is actually playing, hide overlays
+            document.getElementById('playerLoading').classList.add('hidden');
+            document.getElementById('playerError').classList.add('hidden');
+        });
+
+        vPlayer.addEventListener('timeupdate', () => {
+            if(vPlayer.currentTime > 0.5) {
+                 document.getElementById('playerLoading').classList.add('hidden');
+                 document.getElementById('playerError').classList.add('hidden');
+            }
+        });
+
+        vPlayer.addEventListener('error', (e) => {
+             console.error("Video Error", e);
+             // Only show error if we haven't started playing or if it's a fatal error during playback?
+             // Actually, if we are playing and error occurs, we SHOULD show error.
+             // But the user reported "Video is playing BUT error text is shown".
+             // This means the error listener triggered erroneously or concurrently.
+             // Let's add a check: if readyState is HAVE_ENOUGH_DATA, ignore generic errors?
+             // Or better, let the 'playing' listener override it.
+
+             // If we are currently playing, don't show error immediately unless paused?
+             if (vPlayer.paused) {
+                 document.getElementById('playerLoading').classList.add('hidden');
+                 document.getElementById('playerError').classList.remove('hidden');
+             }
+        });
 
         // Settings Functions
         async function openSettings() {
@@ -701,7 +735,6 @@ export default {
         document.getElementById('menuBtn').addEventListener('click', toggleSidebar);
         document.getElementById('searchBtn').addEventListener('click', () => { const q = document.getElementById('searchInput').value; if(q) fetchMods(q); });
         document.getElementById('mobileSearchBtn').addEventListener('click', () => { const q = document.getElementById('mobileSearchInput').value; if(q) fetchMods(q); });
-        document.getElementById('videoPlayer').addEventListener('error', (e) => { console.error("Video Error", e); document.getElementById('playerLoading').classList.add('hidden'); document.getElementById('playerError').classList.remove('hidden'); });
         fetchMods();
     </script>
 </body>
