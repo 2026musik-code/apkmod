@@ -63,8 +63,59 @@ export default {
         }
     }
 
+    // --- Upstream Proxy Headers ---
+    const upstreamHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,id;q=0.8',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://google.com/'
+    };
+
+    // --- API Proxies (Restored for Fallback) ---
+    if (url.pathname === '/api/mod') {
+        const query = url.searchParams.get('query') || 'Michat';
+        const apiUrl = `https://api.ferdev.my.id/search/getmodsapk?query=${query}&apikey=${API_KEY_VAL}`;
+        try {
+            const response = await fetch(apiUrl, { headers: upstreamHeaders });
+            if (!response.ok) {
+                 const txt = await response.text();
+                 return new Response(JSON.stringify({ success: false, message: `Proxy Error ${response.status}: ${txt.substring(0, 100)}` }), { headers: { 'content-type': 'application/json' } });
+            }
+            return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+        } catch(e) {
+            return new Response(JSON.stringify({ success: false, message: `Proxy Fetch Error: ${e.message}` }), { headers: { 'content-type': 'application/json' } });
+        }
+    }
+    if (url.pathname === '/api/drakor') {
+        const query = url.searchParams.get('query') || 'CEO';
+        const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${query}&apikey=${API_KEY_VAL}`;
+        const response = await fetch(apiUrl, { headers: upstreamHeaders });
+        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+    }
+    if (url.pathname === '/api/detail') {
+        const bookId = url.searchParams.get('bookId');
+        const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${API_KEY_VAL}`;
+        const response = await fetch(apiUrl, { headers: upstreamHeaders });
+        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+    }
+    if (url.pathname === '/api/stream') {
+        const videoId = url.searchParams.get('videoId');
+        const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${API_KEY_VAL}`;
+        const response = await fetch(apiUrl, { headers: upstreamHeaders });
+        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
+    }
+
     // --- Video Proxy (Server-Side) ---
-    // Kept to handle potential Referer/CORS issues with specific video streams
     if (url.pathname === '/api/proxy-video') {
         const videoUrl = url.searchParams.get('url');
         if (!videoUrl) return new Response('Missing URL', { status: 400 });
@@ -385,6 +436,11 @@ export default {
         const DETAIL_API_BASE = 'https://api.ferdev.my.id/internet/melolo/detail';
         const STREAM_API_BASE = 'https://api.ferdev.my.id/internet/melolo/stream';
 
+        // Fallback Proxy URLs (Worker)
+        const MOD_PROXY = '/api/mod';
+        const DRAKOR_PROXY = '/api/drakor';
+        const DETAIL_PROXY = '/api/detail';
+        const STREAM_PROXY = '/api/stream';
         const PROXY_VIDEO_BASE = '/api/proxy-video';
         const SETTINGS_API_BASE = '/api/settings';
 
@@ -411,7 +467,6 @@ export default {
             const modPage = document.getElementById('modPage');
             const drakorPage = document.getElementById('drakorPage');
 
-            // Set URL Hash without triggering scroll
             window.history.replaceState(null, null, '#' + page);
 
             if (page === 'home') {
@@ -452,16 +507,33 @@ export default {
             };
         }
 
-        // Updated Fetch Logic with Client-Side Direct Call
+        // --- Fetch with Fallback Logic ---
+        async function robustFetch(directUrl, proxyUrl) {
+            try {
+                // Try Direct Client-Side first
+                const res = await fetch(directUrl);
+                if(res.ok) return await res.json();
+                throw new Error('Direct fetch failed with ' + res.status);
+            } catch(e) {
+                console.warn('Direct fetch failed, trying proxy...', e);
+                // Fallback to Proxy
+                const res2 = await fetch(proxyUrl);
+                const data2 = await res2.json();
+                if(res2.ok && data2.success) return data2;
+                throw new Error('Proxy fallback failed: ' + (data2.message || res2.statusText));
+            }
+        }
+
         async function fetchMods(query = 'Michat') {
             const grid = document.getElementById('modGrid');
             const loading = document.getElementById('loading');
             grid.innerHTML = ''; loading.classList.remove('hidden');
+
+            const directUrl = \`\${MOD_API_BASE}?query=\${query}&apikey=\${ACTIVE_API_KEY}\`;
+            const proxyUrl = \`\${MOD_PROXY}?query=\${query}\`;
+
             try {
-                // Use key from injection
-                const url = \`\${MOD_API_BASE}?query=\${query}&apikey=\${ACTIVE_API_KEY}\`;
-                const res = await fetch(url);
-                const data = await res.json();
+                const data = await robustFetch(directUrl, proxyUrl);
                 if (data.success && data.data) {
                     currentModData = data.data; renderMods(data.data); renderRecommendations(data.data);
                 } else {
@@ -469,7 +541,8 @@ export default {
                     grid.innerHTML = \`<p class="text-center text-gray-500 col-span-full">\${msg}</p>\`;
                 }
             } catch (err) {
-                console.error(err); grid.innerHTML = '<p class="text-center text-red-500 col-span-full">Gagal memuat data (Client-Side).</p>';
+                console.error(err);
+                grid.innerHTML = \`<p class="text-center text-red-500 col-span-full">Gagal memuat data: \${err.message}</p>\`;
             } finally { loading.classList.add('hidden'); }
         }
 
@@ -510,9 +583,14 @@ export default {
             const container = document.getElementById('drakorContent');
             container.innerHTML = '<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-4xl text-gold"></i></div>';
             try {
-                const results = await Promise.all(drakorCategories.map(cat =>
-                    fetch(\`\${DRAKOR_API_BASE}?query=\${cat}&apikey=\${ACTIVE_API_KEY}\`).then(res => res.json()).then(data => ({ category: cat, data: data })).catch(() => ({ category: cat, data: [] }))
-                ));
+                const results = await Promise.all(drakorCategories.map(cat => {
+                    const direct = \`\${DRAKOR_API_BASE}?query=\${cat}&apikey=\${ACTIVE_API_KEY}\`;
+                    const proxy = \`\${DRAKOR_PROXY}?query=\${cat}\`;
+                    return robustFetch(direct, proxy)
+                        .then(data => ({ category: cat, data: data }))
+                        .catch(() => ({ category: cat, data: [] }));
+                }));
+
                 container.innerHTML = '';
                 results.forEach(result => {
                     const items = result.data.result || result.data.data;
@@ -521,7 +599,7 @@ export default {
                     }
                 });
                 if (drakorData['CEO'] && drakorData['CEO'].length > 0) setupHero(drakorData['CEO'][0]);
-            } catch (e) { container.innerHTML = '<p class="text-center text-red-500">Gagal memuat drakor.</p>'; }
+            } catch (e) { container.innerHTML = \`<p class="text-center text-red-500">Gagal memuat drakor: \${e.message}</p>\`; }
         }
 
         function renderDrakorCategory(category, items) {
@@ -579,8 +657,10 @@ export default {
             modal.classList.remove('hidden'); document.body.style.overflow = 'hidden';
 
             try {
-                const res = await fetch(\`\${DETAIL_API_BASE}?bookId=\${item.book_id}&apikey=\${ACTIVE_API_KEY}\`);
-                const data = await res.json();
+                const direct = \`\${DETAIL_API_BASE}?bookId=\${item.book_id}&apikey=\${ACTIVE_API_KEY}\`;
+                const proxy = \`\${DETAIL_PROXY}?bookId=\${item.book_id}\`;
+
+                const data = await robustFetch(direct, proxy);
                 if (data.success && data.result) {
                     if (Array.isArray(data.result)) currentChapters = data.result;
                     else if (data.result.episodes && Array.isArray(data.result.episodes)) currentChapters = data.result.episodes;
@@ -590,7 +670,7 @@ export default {
                      document.getElementById('episodeGrid').innerHTML = '<p class="col-span-full text-center text-gray-500">Tidak ada episode.</p>';
                 }
             } catch (err) {
-                document.getElementById('episodeGrid').innerHTML = '<p class="col-span-full text-center text-red-500">Gagal memuat episode.</p>';
+                document.getElementById('episodeGrid').innerHTML = \`<p class="col-span-full text-center text-red-500">Gagal memuat episode: \${err.message}</p>\`;
             } finally { document.getElementById('episodeGridLoading').classList.add('hidden'); }
         }
 
@@ -614,10 +694,7 @@ export default {
             currentPlayingVideoId = chapter.video_id;
             playerContainer.classList.remove('hidden'); playerContainer.scrollIntoView({ behavior: 'smooth' });
             video.pause(); video.src = ""; video.removeAttribute('poster');
-
-            // Reset states
-            loading.classList.remove('hidden');
-            error.classList.add('hidden');
+            loading.classList.remove('hidden'); error.classList.add('hidden');
 
             if(chapter.cover) {
                  if (chapter.cover.toLowerCase().includes('.heic')) {
@@ -626,9 +703,10 @@ export default {
             }
 
             try {
-                // Fetch Stream URL directly
-                const res = await fetch(\`\${STREAM_API_BASE}?videoId=\${chapter.video_id}&apikey=\${ACTIVE_API_KEY}\`);
-                const data = await res.json();
+                const direct = \`\${STREAM_API_BASE}?videoId=\${chapter.video_id}&apikey=\${ACTIVE_API_KEY}\`;
+                const proxy = \`\${STREAM_PROXY}?videoId=\${chapter.video_id}\`;
+
+                const data = await robustFetch(direct, proxy);
                 if (data.success && data.result && data.result.length > 0) {
                     const preferred = data.result.find(r => r.quality === '720p') || data.result.find(r => r.quality === '540p') || data.result[0];
                     if (preferred && preferred.url) {
@@ -653,22 +731,18 @@ export default {
         function retryVideo() { if (currentPlayingVideoId) { const chapter = currentChapters.find(c => c.video_id === currentPlayingVideoId); if(chapter) playEpisode(chapter); } }
         function closeModal() { document.getElementById('detailModal').classList.add('hidden'); document.body.style.overflow = ''; document.getElementById('videoPlayer').pause(); }
 
-        // --- NEW: Handle Video State Logic to clear errors on play ---
+        // --- Video Logic ---
         const vPlayer = document.getElementById('videoPlayer');
-
         vPlayer.addEventListener('playing', () => {
-            // Video is actually playing, hide overlays
             document.getElementById('playerLoading').classList.add('hidden');
             document.getElementById('playerError').classList.add('hidden');
         });
-
         vPlayer.addEventListener('timeupdate', () => {
             if(vPlayer.currentTime > 0.5) {
                  document.getElementById('playerLoading').classList.add('hidden');
                  document.getElementById('playerError').classList.add('hidden');
             }
         });
-
         vPlayer.addEventListener('error', (e) => {
              console.error("Video Error", e);
              if (vPlayer.paused) {
