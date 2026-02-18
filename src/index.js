@@ -824,6 +824,30 @@ export default {
                  document.getElementById('playerError').classList.remove('hidden');
              }
         });
+        vPlayer.addEventListener('ended', () => {
+            console.log('Video ended. Checking for next episode...');
+            if (currentPlayingVideoId && currentChapters.length > 0) {
+                // Find current chapter index
+                // Note: currentChapters is sorted by episode number in openDetail
+                const currentIndex = currentChapters.findIndex(c => c.video_id === currentPlayingVideoId);
+                if (currentIndex !== -1 && currentIndex < currentChapters.length - 1) {
+                    const nextChapter = currentChapters[currentIndex + 1];
+                    console.log('Autoplaying next episode:', nextChapter.episode);
+
+                    // Show toast notification
+                    const toast = document.createElement('div');
+                    toast.id = 'autoplayToast';
+                    toast.className = 'fixed top-24 left-1/2 transform -translate-x-1/2 bg-gold text-black px-6 py-3 rounded-full shadow-2xl z-[80] font-bold flex items-center gap-2 animate-bounce';
+                    toast.innerHTML = '<i class="fas fa-forward"></i> Memutar Episode ' + nextChapter.episode + '...';
+                    document.body.appendChild(toast);
+
+                    setTimeout(() => {
+                        if(document.getElementById('autoplayToast')) document.getElementById('autoplayToast').remove();
+                        playEpisode(nextChapter);
+                    }, 2000);
+                }
+            }
+        });
 
         // Initialize Routing
         window.addEventListener('load', () => {
