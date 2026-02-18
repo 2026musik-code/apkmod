@@ -113,6 +113,7 @@ export default {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 4px; }
         html { scroll-behavior: smooth; }
         .aspect-poster { aspect-ratio: 2 / 3; }
+        .glass-panel { background: rgba(24, 24, 24, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
     </style>
     <script>
         tailwind.config = {
@@ -132,7 +133,7 @@ export default {
         }
     </script>
 </head>
-<body class="bg-darker text-white font-sans antialiased min-h-screen pb-20">
+<body class="bg-darker text-white font-sans antialiased min-h-screen pb-20 bg-gradient-to-b from-darker to-[#0f0f0f]">
 
     <!-- Header -->
     <header class="fixed top-0 w-full z-50 bg-dark/90 backdrop-blur-md border-b border-white/10 shadow-lg">
@@ -264,10 +265,16 @@ export default {
     <div id="detailModal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
         <div class="relative min-h-screen md:flex md:items-center md:justify-center p-0 md:p-4">
-            <div class="bg-[#181818] w-full md:max-w-4xl md:rounded-xl shadow-2xl overflow-hidden relative min-h-screen md:min-h-0">
-                <button onclick="closeModal()" class="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 rounded-full text-white hover:bg-white/20 flex items-center justify-center transition">
+            <div class="glass-panel w-full md:max-w-4xl md:rounded-xl shadow-2xl overflow-hidden relative min-h-screen md:min-h-0 bg-[#181818]">
+                <button onclick="closeModal()" class="absolute top-4 right-4 z-30 w-10 h-10 bg-black/50 rounded-full text-white hover:bg-white/20 flex items-center justify-center transition">
                     <i class="fas fa-times"></i>
                 </button>
+
+                <!-- Branding Header -->
+                <div class="absolute top-0 left-0 p-4 z-20 flex items-center gap-2 pointer-events-none">
+                    <i class="fas fa-crown text-gold drop-shadow-lg"></i>
+                    <span class="text-gold font-bold tracking-wider text-sm drop-shadow-lg">MOD APPS</span>
+                </div>
 
                 <!-- Player -->
                  <div id="playerContainer" class="w-full aspect-video bg-black hidden relative group">
@@ -296,7 +303,7 @@ export default {
                     <!-- Content Side -->
                     <div class="p-6 md:py-8 space-y-6">
                         <!-- Mobile Header -->
-                        <div class="md:hidden flex gap-4 mb-4">
+                        <div class="md:hidden flex gap-4 mb-4 mt-8">
                              <img id="modalPosterMobile" src="" class="w-24 h-36 object-cover rounded shadow-lg bg-gray-800">
                              <div>
                                 <h2 id="modalTitle" class="text-2xl font-bold text-white mb-1">Title</h2>
@@ -343,7 +350,7 @@ export default {
     <!-- Settings Modal -->
     <div id="settingsModal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4">
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeSettings()"></div>
-        <div class="bg-[#181818] w-full max-w-md rounded-xl shadow-2xl overflow-hidden relative p-6 z-10 border border-white/10">
+        <div class="glass-panel w-full max-w-md rounded-xl shadow-2xl overflow-hidden relative p-6 z-10">
             <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
                 <i class="fas fa-cog text-gold"></i> Pengaturan
             </h3>
@@ -403,6 +410,10 @@ export default {
             toggleSidebar();
             const modPage = document.getElementById('modPage');
             const drakorPage = document.getElementById('drakorPage');
+
+            // Set URL Hash without triggering scroll
+            window.history.replaceState(null, null, '#' + page);
+
             if (page === 'home') {
                 modPage.classList.remove('hidden'); modPage.classList.remove('opacity-0');
                 drakorPage.classList.add('hidden');
@@ -660,18 +671,19 @@ export default {
 
         vPlayer.addEventListener('error', (e) => {
              console.error("Video Error", e);
-             // Only show error if we haven't started playing or if it's a fatal error during playback?
-             // Actually, if we are playing and error occurs, we SHOULD show error.
-             // But the user reported "Video is playing BUT error text is shown".
-             // This means the error listener triggered erroneously or concurrently.
-             // Let's add a check: if readyState is HAVE_ENOUGH_DATA, ignore generic errors?
-             // Or better, let the 'playing' listener override it.
-
-             // If we are currently playing, don't show error immediately unless paused?
              if (vPlayer.paused) {
                  document.getElementById('playerLoading').classList.add('hidden');
                  document.getElementById('playerError').classList.remove('hidden');
              }
+        });
+
+        // Initialize Routing
+        window.addEventListener('load', () => {
+            if(window.location.hash === '#drakor') {
+                switchPage('drakor');
+            } else {
+                fetchMods();
+            }
         });
 
         // Settings Functions
