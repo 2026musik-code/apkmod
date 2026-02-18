@@ -2,7 +2,98 @@
 // Default fallback for development/demo (Note: Should be kept secret in production)
 const DEFAULT_API_KEY = 'dedi131';
 
-const html = `
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    // --- Key Management ---
+    // Try to get key from R2 first, then Env, then Default
+    let API_KEY_VAL = null;
+    let isCustomKey = false;
+
+    // Check R2
+    if (env.BUCKET) {
+        try {
+            const obj = await env.BUCKET.get('API_KEY');
+            if (obj) {
+                API_KEY_VAL = (await obj.text()).trim();
+                isCustomKey = true;
+            }
+        } catch (e) {
+            console.error('Failed to read from R2', e);
+        }
+    }
+
+    // Fallback
+    if (!API_KEY_VAL) {
+        API_KEY_VAL = env.API_KEY || DEFAULT_API_KEY;
+    }
+
+    // Handle Settings Save/Check/Reset
+    if (url.pathname === '/api/settings') {
+        if (!env.BUCKET) return new Response(JSON.stringify({ success: false, message: 'R2 Bucket not configured' }), { headers: {'content-type': 'application/json'} });
+
+        // GET: Check status
+        if (request.method === 'GET') {
+             return new Response(JSON.stringify({ configured: isCustomKey }), { headers: {'content-type': 'application/json'} });
+        }
+
+        // POST: Save
+        if (request.method === 'POST') {
+            try {
+                const body = await request.json();
+                if(body.key) {
+                    await env.BUCKET.put('API_KEY', body.key.trim());
+                    return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
+                }
+                return new Response(JSON.stringify({ success: false, message: 'Missing key' }), { headers: {'content-type': 'application/json'} });
+            } catch(e) {
+                return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
+            }
+        }
+
+        // DELETE: Reset
+        if (request.method === 'DELETE') {
+             try {
+                await env.BUCKET.delete('API_KEY');
+                return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
+             } catch(e) {
+                return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
+             }
+        }
+    }
+
+    // --- Video Proxy (Server-Side) ---
+    // Kept to handle potential Referer/CORS issues with specific video streams
+    if (url.pathname === '/api/proxy-video') {
+        const videoUrl = url.searchParams.get('url');
+        if (!videoUrl) return new Response('Missing URL', { status: 400 });
+
+        try {
+            const vidRes = await fetch(videoUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Referer': 'https://tiktok.com/',
+                }
+            });
+
+            // Stream back with CORS
+            const headers = new Headers(vidRes.headers);
+            headers.set('Access-Control-Allow-Origin', '*');
+            headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+            return new Response(vidRes.body, {
+                status: vidRes.status,
+                statusText: vidRes.statusText,
+                headers: headers
+            });
+        } catch (e) {
+            return new Response('Proxy Error', { status: 502 });
+        }
+    }
+
+    // --- HTML Injection ---
+    const html = `
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -278,11 +369,15 @@ const html = `
     </div>
 
     <script>
-        // Use local proxy paths
-        const MOD_API_BASE = '/api/mod';
-        const DRAKOR_API_BASE = '/api/drakor';
-        const DETAIL_API_BASE = '/api/detail';
-        const STREAM_API_BASE = '/api/stream';
+        // Inject API Key from Worker
+        const ACTIVE_API_KEY = '${API_KEY_VAL}';
+
+        // Client-Side Direct Fetch URLs
+        const MOD_API_BASE = 'https://api.ferdev.my.id/search/getmodsapk';
+        const DRAKOR_API_BASE = 'https://api.ferdev.my.id/internet/melolo/search';
+        const DETAIL_API_BASE = 'https://api.ferdev.my.id/internet/melolo/detail';
+        const STREAM_API_BASE = 'https://api.ferdev.my.id/internet/melolo/stream';
+
         const PROXY_VIDEO_BASE = '/api/proxy-video';
         const SETTINGS_API_BASE = '/api/settings';
 
@@ -346,12 +441,15 @@ const html = `
             };
         }
 
+        // Updated Fetch Logic with Client-Side Direct Call
         async function fetchMods(query = 'Michat') {
             const grid = document.getElementById('modGrid');
             const loading = document.getElementById('loading');
             grid.innerHTML = ''; loading.classList.remove('hidden');
             try {
-                const res = await fetch(\`\${MOD_API_BASE}?query=\${query}\`);
+                // Use key from injection
+                const url = \`\${MOD_API_BASE}?query=\${query}&apikey=\${ACTIVE_API_KEY}\`;
+                const res = await fetch(url);
                 const data = await res.json();
                 if (data.success && data.data) {
                     currentModData = data.data; renderMods(data.data); renderRecommendations(data.data);
@@ -360,7 +458,7 @@ const html = `
                     grid.innerHTML = \`<p class="text-center text-gray-500 col-span-full">\${msg}</p>\`;
                 }
             } catch (err) {
-                console.error(err); grid.innerHTML = '<p class="text-center text-red-500 col-span-full">Gagal memuat data.</p>';
+                console.error(err); grid.innerHTML = '<p class="text-center text-red-500 col-span-full">Gagal memuat data (Client-Side).</p>';
             } finally { loading.classList.add('hidden'); }
         }
 
@@ -402,7 +500,7 @@ const html = `
             container.innerHTML = '<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-4xl text-gold"></i></div>';
             try {
                 const results = await Promise.all(drakorCategories.map(cat =>
-                    fetch(\`\${DRAKOR_API_BASE}?query=\${cat}\`).then(res => res.json()).then(data => ({ category: cat, data: data })).catch(() => ({ category: cat, data: [] }))
+                    fetch(\`\${DRAKOR_API_BASE}?query=\${cat}&apikey=\${ACTIVE_API_KEY}\`).then(res => res.json()).then(data => ({ category: cat, data: data })).catch(() => ({ category: cat, data: [] }))
                 ));
                 container.innerHTML = '';
                 results.forEach(result => {
@@ -431,8 +529,6 @@ const html = `
                 const img = document.createElement('img');
                 img.className = 'w-full h-full object-cover transition duration-500 group-hover/card:brightness-75';
                 loadImage(item.cover, img);
-                imgContainer.innerHTML = \`<img src="\${img.src}" class="w-full h-full object-cover transition duration-500 group-hover/card:brightness-75"><div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition duration-300"><i class="fas fa-play-circle text-5xl text-gold drop-shadow-lg"></i></div>\`;
-                // Need to re-apply load image to the new innerHTML img or just append
                 imgContainer.innerHTML = '';
                 imgContainer.appendChild(img);
                 const playOverlay = document.createElement('div'); playOverlay.className = 'absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition duration-300'; playOverlay.innerHTML = '<i class="fas fa-play-circle text-5xl text-gold drop-shadow-lg"></i>';
@@ -472,7 +568,7 @@ const html = `
             modal.classList.remove('hidden'); document.body.style.overflow = 'hidden';
 
             try {
-                const res = await fetch(\`\${DETAIL_API_BASE}?bookId=\${item.book_id}\`);
+                const res = await fetch(\`\${DETAIL_API_BASE}?bookId=\${item.book_id}&apikey=\${ACTIVE_API_KEY}\`);
                 const data = await res.json();
                 if (data.success && data.result) {
                     if (Array.isArray(data.result)) currentChapters = data.result;
@@ -516,11 +612,15 @@ const html = `
             }
 
             try {
-                const res = await fetch(\`\${STREAM_API_BASE}?videoId=\${chapter.video_id}\`);
+                // Fetch Stream URL directly
+                const res = await fetch(\`\${STREAM_API_BASE}?videoId=\${chapter.video_id}&apikey=\${ACTIVE_API_KEY}\`);
                 const data = await res.json();
                 if (data.success && data.result && data.result.length > 0) {
                     const preferred = data.result.find(r => r.quality === '720p') || data.result.find(r => r.quality === '540p') || data.result[0];
                     if (preferred && preferred.url) {
+                        // Use Proxy for the Video Content itself if needed, OR try direct if possible.
+                        // Ideally we try direct first, but we don't know if the video host allows CORS.
+                        // Safe bet: Use proxy for video content, but key is already handled.
                         const proxyUrl = \`\${PROXY_VIDEO_BASE}?url=\${encodeURIComponent(preferred.url)}\`;
                         if (Hls.isSupported() && preferred.url.endsWith('.m3u8')) {
                             const hls = new Hls(); hls.loadSource(proxyUrl); hls.attachMedia(video);
@@ -607,156 +707,6 @@ const html = `
 </body>
 </html>
 `;
-
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-
-    // --- Key Management ---
-    // Try to get key from R2 first, then Env, then Default
-    let API_KEY_VAL = null;
-    let isCustomKey = false;
-
-    // Check R2
-    if (env.BUCKET) {
-        try {
-            const obj = await env.BUCKET.get('API_KEY');
-            if (obj) {
-                API_KEY_VAL = (await obj.text()).trim();
-                isCustomKey = true;
-            }
-        } catch (e) {
-            console.error('Failed to read from R2', e);
-        }
-    }
-
-    // Fallback
-    if (!API_KEY_VAL) {
-        API_KEY_VAL = env.API_KEY || DEFAULT_API_KEY;
-    }
-
-    // Handle Settings Save/Check/Reset
-    if (url.pathname === '/api/settings') {
-        if (!env.BUCKET) return new Response(JSON.stringify({ success: false, message: 'R2 Bucket not configured' }), { headers: {'content-type': 'application/json'} });
-
-        // GET: Check status
-        if (request.method === 'GET') {
-             return new Response(JSON.stringify({ configured: isCustomKey }), { headers: {'content-type': 'application/json'} });
-        }
-
-        // POST: Save
-        if (request.method === 'POST') {
-            try {
-                const body = await request.json();
-                if(body.key) {
-                    await env.BUCKET.put('API_KEY', body.key.trim());
-                    return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
-                }
-                return new Response(JSON.stringify({ success: false, message: 'Missing key' }), { headers: {'content-type': 'application/json'} });
-            } catch(e) {
-                return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
-            }
-        }
-
-        // DELETE: Reset
-        if (request.method === 'DELETE') {
-             try {
-                await env.BUCKET.delete('API_KEY');
-                return new Response(JSON.stringify({ success: true }), { headers: {'content-type': 'application/json'} });
-             } catch(e) {
-                return new Response(JSON.stringify({ success: false, message: e.message }), { headers: {'content-type': 'application/json'} });
-             }
-        }
-    }
-
-    if (!API_KEY_VAL) {
-        // If we still have no key, we can't proceed with API calls, but we can load the UI so the user can enter it
-        if (!url.pathname.startsWith('/api/') || url.pathname === '/api/settings') {
-             // Let it pass to load HTML or settings
-        } else {
-             return new Response('API_KEY is not configured. Please use Settings.', { status: 500 });
-        }
-    }
-
-    // Common headers for upstream to avoid IP/UA blocking
-    const upstreamHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,id;q=0.8',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
-        'Referer': 'https://google.com/'
-    };
-
-    // --- API Proxies ---
-    if (url.pathname === '/api/mod') {
-        const query = url.searchParams.get('query') || 'Michat';
-        const apiUrl = `https://api.ferdev.my.id/search/getmodsapk?query=${query}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl, { headers: upstreamHeaders });
-
-        if (!response.ok) {
-            const txt = await response.text();
-            console.error(`Upstream API Error [${response.status}]: ${txt.substring(0, 200)}`);
-            return new Response(JSON.stringify({ success: false, message: 'Upstream Error: ' + response.status }), { headers: { 'content-type': 'application/json' } });
-        }
-
-        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
-    }
-    if (url.pathname === '/api/drakor') {
-        const query = url.searchParams.get('query') || 'CEO';
-        const apiUrl = `https://api.ferdev.my.id/internet/melolo/search?query=${query}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl, { headers: upstreamHeaders });
-        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
-    }
-    if (url.pathname === '/api/detail') {
-        const bookId = url.searchParams.get('bookId');
-        const apiUrl = `https://api.ferdev.my.id/internet/melolo/detail?bookId=${bookId}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl, { headers: upstreamHeaders });
-        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
-    }
-    if (url.pathname === '/api/stream') {
-        const videoId = url.searchParams.get('videoId');
-        const apiUrl = `https://api.ferdev.my.id/internet/melolo/stream?videoId=${videoId}&apikey=${API_KEY_VAL}`;
-        const response = await fetch(apiUrl, { headers: upstreamHeaders });
-        return new Response(response.body, { headers: { 'content-type': 'application/json' } });
-    }
-
-    // --- Video Proxy ---
-    if (url.pathname === '/api/proxy-video') {
-        const videoUrl = url.searchParams.get('url');
-        if (!videoUrl) return new Response('Missing URL', { status: 400 });
-
-        try {
-            const vidRes = await fetch(videoUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                    'Referer': 'https://tiktok.com/',
-                }
-            });
-
-            // Stream back with CORS
-            const headers = new Headers(vidRes.headers);
-            headers.set('Access-Control-Allow-Origin', '*');
-            headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-
-            // Handle range requests if needed (Cloudflare workers handle streaming automatically usually)
-            return new Response(vidRes.body, {
-                status: vidRes.status,
-                statusText: vidRes.statusText,
-                headers: headers
-            });
-        } catch (e) {
-            return new Response('Proxy Error', { status: 502 });
-        }
-    }
 
     return new Response(html, {
       headers: { 'content-type': 'text/html;charset=UTF-8' },
